@@ -1,0 +1,31 @@
+{
+  "name": "high-concurrency-shopsphere",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Flash-sale ready ordering engine with Redis locks, BullMQ buffering, and PostgreSQL",
+  "packageManager": "pnpm@9.12.2",
+  "scripts": {
+    "dev": "concurrently \"pnpm --filter @shopsphere/api dev\" \"pnpm --filter @shopsphere/worker dev\"",
+    "dev:all": "concurrently \"pnpm --filter @shopsphere/api dev\" \"pnpm --filter @shopsphere/worker dev\" \"pnpm --filter @shopsphere/web dev\"",
+    "dev:api": "pnpm --filter @shopsphere/api dev",
+    "dev:worker": "pnpm --filter @shopsphere/worker dev",
+    "dev:web": "pnpm --filter @shopsphere/web dev",
+    "build": "pnpm -r build",
+    "build:web": "pnpm --filter @shopsphere/web build",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:deploy": "prisma migrate deploy",
+    "db:seed": "pnpm --filter @shopsphere/api seed",
+    "compose:infra": "docker compose up -d postgres redis",
+    "compose:full": "docker compose --profile full up --build",
+    "compose:down": "docker compose down -v",
+    "load:test": "k6 run scripts/load-test.js"
+  },
+  "devDependencies": {
+    "@prisma/client": "^5.20.0",
+    "concurrently": "^9.0.1",
+    "prisma": "^5.20.0",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.3"
+  }
+}

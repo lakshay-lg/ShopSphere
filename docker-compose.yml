@@ -1,0 +1,75 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: shopsphere
+      POSTGRES_PASSWORD: shopsphere
+      POSTGRES_DB: shopsphere
+    ports:
+      - "${SHOPSPHERE_POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shopsphere -d shopsphere"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "${SHOPSPHERE_REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    profiles: ["full"]
+    image: node:20-alpine
+    working_dir: /app
+    command: sh -c "corepack enable && pnpm install && pnpm prisma:generate && pnpm --filter @shopsphere/api dev"
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      DATABASE_URL: postgresql://shopsphere:shopsphere@postgres:5432/shopsphere?schema=public
+      REDIS_URL: redis://redis:6379
+      IDEMPOTENCY_TTL_SECONDS: 7200
+      ORDER_LOCK_TTL_MS: 5000
+      ORDER_LOCK_RETRY_ATTEMPTS: 20
+      ORDER_LOCK_RETRY_DELAY_MS: 30
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./:/app
+
+  worker:
+    profiles: ["full"]
+    image: node:20-alpine
+    working_dir: /app
+    command: sh -c "corepack enable && pnpm install && pnpm prisma:generate && pnpm --filter @shopsphere/worker dev"
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://shopsphere:shopsphere@postgres:5432/shopsphere?schema=public
+      REDIS_URL: redis://redis:6379
+      ORDER_LOCK_TTL_MS: 5000
+      ORDER_LOCK_RETRY_ATTEMPTS: 20
+      ORDER_LOCK_RETRY_DELAY_MS: 30
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./:/app
+
+volumes:
+  postgres_data:

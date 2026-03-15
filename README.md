@@ -201,7 +201,7 @@ curl -X POST http://localhost:3000/api/contact \
   -d '{"name":"Lakshay","email":"lakshay@example.com","message":"Loved the architecture breakdown."}'
 ```
 
-Note: contact submissions are currently validated and logged by the API; they are not persisted in a dedicated table yet.
+Note: contact submissions are validated and stored in PostgreSQL via the `ContactMessage` model.
 
 ## Frontend Behavior
 

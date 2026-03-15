@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { prisma } from "../db.js";
 
 const contactBody = z.object({
   name: z.string().min(1).max(100),
@@ -19,15 +20,27 @@ export async function contactRoutes(app: FastifyInstance): Promise<void> {
 
     const { name, email, message } = parsed.data;
 
-    // Log the submission — in production wire to an email service or store in DB
+    const saved = await prisma.contactMessage.create({
+      data: { name, email, message },
+      select: { id: true, email: true, createdAt: true },
+    });
+
     app.log.info(
-      { contact: { name, email, messagePreview: message.slice(0, 100) } },
-      "Contact form submission received"
+      {
+        contact: {
+          id: saved.id,
+          email: saved.email,
+          createdAt: saved.createdAt,
+          messagePreview: message.slice(0, 100),
+        },
+      },
+      "Contact form submission stored"
     );
 
     return reply.status(200).send({
       ok: true,
       message: "Message received. We'll get back to you within 24 hours.",
+      submissionId: saved.id,
     });
   });
 }

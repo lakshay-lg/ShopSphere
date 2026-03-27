@@ -128,7 +128,7 @@ export const blogPosts: BlogPost[] = [
         ]
       }
     ]
-  }
+  },
   {
     slug: "users-auth-and-the-question-of-identity",
     title: "Users, Auth, and the Question of Identity",

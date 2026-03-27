@@ -5,6 +5,11 @@ import jwt from "jsonwebtoken";
 import { prisma } from "../db.js";
 import { env } from "../config.js";
 
+const changePasswordBody = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(8, "New password must be at least 8 characters"),
+});
+
 const registerBody = z.object({
   email: z.string().email(),
   password: z.string().min(8, "Password must be at least 8 characters"),
@@ -23,8 +28,10 @@ function signToken(payload: { userId: string; email: string }): string {
 }
 
 export async function authRoutes(app: FastifyInstance): Promise<void> {
-  // POST /api/auth/register
-  app.post("/auth/register", async (request, reply) => {
+  // POST /api/auth/register — 5 attempts per IP per minute
+  app.post("/auth/register", {
+    config: { rateLimit: { max: 5, timeWindow: "1 minute" } },
+  }, async (request, reply) => {
     const parsed = registerBody.safeParse(request.body);
     if (!parsed.success) {
       return reply
@@ -49,8 +56,10 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     return reply.status(201).send({ token, user });
   });
 
-  // POST /api/auth/login
-  app.post("/auth/login", async (request, reply) => {
+  // POST /api/auth/login — 10 attempts per IP per minute
+  app.post("/auth/login", {
+    config: { rateLimit: { max: 10, timeWindow: "1 minute" } },
+  }, async (request, reply) => {
     const parsed = loginBody.safeParse(request.body);
     if (!parsed.success) {
       return reply.status(400).send({ error: "Invalid input" });
@@ -104,5 +113,41 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     }
 
     return reply.send({ user });
+  });
+
+  // PATCH /api/auth/me — change password
+  app.patch("/auth/me", async (request, reply) => {
+    const authHeader = request.headers.authorization;
+    if (!authHeader?.startsWith("Bearer ")) {
+      return reply.status(401).send({ error: "No token provided" });
+    }
+
+    const token = authHeader.slice(7);
+    let payload: { userId: string; email: string };
+    try {
+      payload = jwt.verify(token, env.JWT_SECRET) as { userId: string; email: string };
+    } catch {
+      return reply.status(401).send({ error: "Invalid or expired token" });
+    }
+
+    const parsed = changePasswordBody.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.errors[0]?.message ?? "Invalid input" });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: payload.userId } });
+    if (!user) {
+      return reply.status(401).send({ error: "User not found" });
+    }
+
+    const valid = await bcrypt.compare(parsed.data.currentPassword, user.passwordHash);
+    if (!valid) {
+      return reply.status(400).send({ error: "Current password is incorrect" });
+    }
+
+    const newHash = await bcrypt.hash(parsed.data.newPassword, 12);
+    await prisma.user.update({ where: { id: user.id }, data: { passwordHash: newHash } });
+
+    return reply.send({ ok: true, message: "Password updated successfully" });
   });
 }

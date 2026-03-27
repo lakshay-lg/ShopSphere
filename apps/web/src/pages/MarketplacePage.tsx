@@ -1,5 +1,4 @@
 import {
-  type CSSProperties,
   useCallback,
   useDeferredValue,
   useEffect,
@@ -7,6 +6,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { Link } from "react-router-dom";
 import "../styles.css";
 import { useAuth } from "../context/AuthContext.js";
 
@@ -47,14 +47,21 @@ interface FlashSaleOrderResponse {
   idempotencyKey?: string;
 }
 
+interface ApiOrderItem {
+  id: string;
+  productId: string;
+  quantity: number;
+  priceCents: number;
+  product: { id: string; name: string; sku: string };
+}
+
 interface ApiOrder {
   id: string;
   queueJobId: string;
   userId: string;
-  productId: string;
-  quantity: number;
   status: "CONFIRMED" | "FAILED";
   failureReason: string | null;
+  items: ApiOrderItem[];
   createdAt: string;
   updatedAt: string;
 }
@@ -68,9 +75,8 @@ interface JobStatusResponse {
 interface TrackedOrder {
   jobId: string;
   idempotencyKey: string;
-  productId: string;
+  items: CartItem[];
   userId: string;
-  quantity: number;
   queueState: QueueState;
   orderStatus: OrderStatus;
   failureReason?: string;
@@ -79,6 +85,17 @@ interface TrackedOrder {
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
 const POLL_INTERVAL_MS = 2000;
+
+interface ShippingAddress {
+  id: string;
+  fullName: string;
+  line1: string;
+  line2?: string | null;
+  city: string;
+  state: string;
+  postalCode: string;
+  isDefault: boolean;
+}
 
 const currency = new Intl.NumberFormat("en-IN", {
   style: "currency",
@@ -220,12 +237,19 @@ const mapSnapshotToOrder = (
   snapshot: JobStatusResponse,
   previous?: TrackedOrder,
 ): TrackedOrder => {
+  const items: CartItem[] =
+    previous?.items ??
+    snapshot.order?.items.map((i) => ({
+      productId: i.productId,
+      quantity: i.quantity,
+    })) ??
+    [];
+
   return {
     jobId: snapshot.jobId,
     idempotencyKey: previous?.idempotencyKey ?? "lookup",
-    productId: previous?.productId ?? snapshot.order?.productId ?? "unknown",
+    items,
     userId: previous?.userId ?? snapshot.order?.userId ?? "unknown",
-    quantity: snapshot.order?.quantity ?? previous?.quantity ?? 0,
     queueState: snapshot.queueState,
     orderStatus: snapshot.order?.status ?? previous?.orderStatus,
     failureReason:
@@ -239,14 +263,31 @@ const parseJSON = async <T,>(response: Response): Promise<T> => {
 };
 
 function MarketplacePage() {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const [health, setHealth] = useState<HealthState>("checking");
   const [products, setProducts] = useState<Product[]>([]);
   const [productsLoading, setProductsLoading] = useState(true);
   const [productsError, setProductsError] = useState("");
-  const [trackedOrders, setTrackedOrders] = useState<TrackedOrder[]>([]);
+  const [addresses, setAddresses] = useState<ShippingAddress[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<string>("");
+
+  const [trackedOrders, setTrackedOrders] = useState<TrackedOrder[]>(() => {
+    try {
+      const stored = localStorage.getItem("ss_order_relay");
+      return stored ? (JSON.parse(stored) as TrackedOrder[]) : [];
+    } catch {
+      return [];
+    }
+  });
   const trackedOrdersRef = useRef<TrackedOrder[]>([]);
-  const [cart, setCart] = useState<CartItem[]>([]);
+  const [cart, setCart] = useState<CartItem[]>(() => {
+    try {
+      const stored = localStorage.getItem("ss_cart");
+      return stored ? (JSON.parse(stored) as CartItem[]) : [];
+    } catch {
+      return [];
+    }
+  });
   const [userId, setUserId] = useState("shopper-001");
   const [quantityByProduct, setQuantityByProduct] = useState<
     Record<string, number>
@@ -264,16 +305,40 @@ function MarketplacePage() {
 
   useEffect(() => {
     if (user?.email) {
-      setUserId(user.email);
+      setUserId(user.id);
       return;
     }
-
     setUserId("shopper-001");
   }, [user]);
 
   useEffect(() => {
+    if (!user || !token) { setAddresses([]); setSelectedAddressId(""); return; }
+    fetch(`${API_BASE}/api/addresses`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.json() as Promise<{ addresses: ShippingAddress[] }>)
+      .then((data) => {
+        setAddresses(data.addresses);
+        const def = data.addresses.find((a) => a.isDefault);
+        if (def) setSelectedAddressId(def.id);
+      })
+      .catch(() => {});
+  }, [user, token]);
+
+  useEffect(() => {
     trackedOrdersRef.current = trackedOrders;
+    try {
+      localStorage.setItem("ss_order_relay", JSON.stringify(trackedOrders));
+    } catch {
+      // storage quota exceeded — ignore
+    }
   }, [trackedOrders]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("ss_cart", JSON.stringify(cart));
+    } catch {
+      // storage quota exceeded — ignore
+    }
+  }, [cart]);
 
   const loadProducts = useCallback(async (silent: boolean) => {
     if (!silent) {
@@ -400,10 +465,10 @@ function MarketplacePage() {
 
   const enqueueOrder = useCallback(
     async (
-      productId: string,
-      quantity: number,
+      items: CartItem[],
       normalizedUserId: string,
       idempotencyKey: string,
+      shippingAddressId?: string,
     ): Promise<FlashSaleOrderResponse> => {
       const response = await fetch(`${API_BASE}/api/flash-sale/order`, {
         method: "POST",
@@ -413,8 +478,8 @@ function MarketplacePage() {
         },
         body: JSON.stringify({
           userId: normalizedUserId,
-          productId,
-          quantity,
+          items,
+          ...(shippingAddressId ? { shippingAddressId } : {}),
         }),
       });
 
@@ -433,8 +498,7 @@ function MarketplacePage() {
 
   const registerTrackedOrder = useCallback(
     (
-      product: Product,
-      quantity: number,
+      items: CartItem[],
       normalizedUserId: string,
       idempotencyKey: string,
       payload: FlashSaleOrderResponse,
@@ -446,9 +510,8 @@ function MarketplacePage() {
       const optimisticOrder: TrackedOrder = {
         jobId: payload.jobId,
         idempotencyKey,
-        productId: product.id,
+        items,
         userId: normalizedUserId,
-        quantity,
         queueState:
           payload.status === "IN_FLIGHT"
             ? "active"
@@ -527,20 +590,14 @@ function MarketplacePage() {
       setPlacingProductId(product.id);
 
       try {
+        const items: CartItem[] = [{ productId: product.id, quantity }];
         const payload = await enqueueOrder(
-          product.id,
-          quantity,
+          items,
           normalizedUserId,
           idempotencyKey,
         );
 
-        registerTrackedOrder(
-          product,
-          quantity,
-          normalizedUserId,
-          idempotencyKey,
-          payload,
-        );
+        registerTrackedOrder(items, normalizedUserId, idempotencyKey, payload);
 
         if (payload.status === "DUPLICATE") {
           setActiveMessage(
@@ -758,73 +815,37 @@ function MarketplacePage() {
 
     setCheckouting(true);
 
-    let queued = 0;
-    let duplicates = 0;
-    let inFlight = 0;
-    let failed = 0;
-    const successfulProductIds = new Set<string>();
-    const failureMessages: string[] = [];
-
     try {
-      for (const entry of cartEntries) {
-        if (!entry.product) {
-          failed += 1;
-          failureMessages.push("A cart product is missing from the catalog.");
-          continue;
-        }
+      const items: CartItem[] = cartEntries.map(({ item }) => ({
+        productId: item.productId,
+        quantity: item.quantity,
+      }));
+      const idempotencyKey = buildIdempotencyKey();
 
-        const idempotencyKey = buildIdempotencyKey();
-
-        try {
-          const payload = await enqueueOrder(
-            entry.product.id,
-            entry.item.quantity,
-            normalizedUserId,
-            idempotencyKey,
-          );
-
-          registerTrackedOrder(
-            entry.product,
-            entry.item.quantity,
-            normalizedUserId,
-            idempotencyKey,
-            payload,
-          );
-
-          successfulProductIds.add(entry.item.productId);
-
-          if (payload.status === "QUEUED") {
-            queued += 1;
-          } else if (payload.status === "DUPLICATE") {
-            duplicates += 1;
-          } else {
-            inFlight += 1;
-          }
-        } catch (error) {
-          failed += 1;
-          failureMessages.push(
-            error instanceof Error
-              ? `${entry.product.name}: ${error.message}`
-              : `${entry.product.name}: checkout failed`,
-          );
-        }
-      }
-
-      setCart((previous) =>
-        previous.filter((item) => !successfulProductIds.has(item.productId)),
+      const payload = await enqueueOrder(
+        items,
+        normalizedUserId,
+        idempotencyKey,
+        selectedAddressId || undefined,
       );
+      registerTrackedOrder(items, normalizedUserId, idempotencyKey, payload);
 
+      setCart([]);
       await Promise.all([loadProducts(true), refreshTrackedOrders()]);
 
-      if (failed === 0) {
-        setActiveMessage(
-          `Checkout dispatched ${successfulProductIds.size} line(s). ${queued} queued, ${duplicates} reused, ${inFlight} active.`,
-        );
+      if (payload.status === "DUPLICATE") {
+        setActiveMessage(`Duplicate request — existing job reused.`);
+      } else if (payload.status === "IN_FLIGHT") {
+        setActiveMessage(`A matching request is already in flight.`);
       } else {
         setActiveMessage(
-          `Checkout sent ${successfulProductIds.size} line(s) with ${failed} failure(s). ${failureMessages[0]}`,
+          `Checkout queued ${items.length} line(s). Job ${payload.jobId}`,
         );
       }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Checkout failed";
+      setActiveMessage(message);
     } finally {
       setCheckouting(false);
     }
@@ -834,208 +855,277 @@ function MarketplacePage() {
     loadProducts,
     refreshTrackedOrders,
     registerTrackedOrder,
+    selectedAddressId,
     userId,
   ]);
 
+  const urgencyClasses: Record<string, string> = {
+    danger: "bg-red-100 text-red-700",
+    warn: "bg-tertiary-fixed/40 text-tertiary",
+    info: "bg-secondary-container/50 text-on-secondary-container",
+    good: "bg-green-100 text-green-700",
+  };
+
+  const orderToneClasses: Record<string, string> = {
+    good: "border-l-green-500 bg-green-50/50",
+    warn: "border-l-tertiary-fixed-dim bg-tertiary-fixed/10",
+    danger: "border-l-error bg-error-container/20",
+    info: "border-l-primary-fixed-dim bg-primary-fixed/10",
+  };
+
   return (
-    <div className="shell">
-      <header className="topbar">
+    <div className="page-container">
+      {/* Page header */}
+      <header className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <p className="eyebrow">ShopSphere Frontline</p>
-          <h1>Flash Drop Storefront</h1>
+          <h1 className="font-headline text-5xl font-bold tracking-tight text-on-surface">
+            Marketplace
+          </h1>
+          <p className="text-on-surface-variant mt-1">
+            Curated collections for the modern digital merchant.
+          </p>
         </div>
-        <div className={`health-pill health-${health}`}>
-          <span className="pulse" />
+        <div
+          className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider self-start md:self-auto
+          ${health === "ok" ? "bg-green-100 text-green-700" : health === "down" ? "bg-red-100 text-red-700" : "bg-surface-container text-on-surface-variant"}`}
+        >
+          <span
+            className={`w-2 h-2 rounded-full ${health === "ok" ? "bg-green-500 animate-pulse" : health === "down" ? "bg-red-500" : "bg-outline animate-pulse"}`}
+          ></span>
           API {health.toUpperCase()}
         </div>
       </header>
 
-      <section className="metric-strip">
-        <article className="metric-card">
-          <p className="metric-label">Products Live</p>
-          <p className="metric-value">{products.length}</p>
-        </article>
-        <article className="metric-card">
-          <p className="metric-label">Search Results</p>
-          <p className="metric-value">{filteredProducts.length}</p>
-        </article>
-        <article className="metric-card">
-          <p className="metric-label">Total Units Left</p>
-          <p className="metric-value">{totalStock}</p>
-        </article>
-        <article className="metric-card">
-          <p className="metric-label">Low Stock Alerts</p>
-          <p className="metric-value">{lowStockCount}</p>
-        </article>
-        <article className="metric-card">
-          <p className="metric-label">Cart Units</p>
-          <p className="metric-value">{cartUnits}</p>
-        </article>
-        <article className="metric-card">
-          <p className="metric-label">Pending Queue Jobs</p>
-          <p className="metric-value">{pendingCount}</p>
-        </article>
-        <article className="metric-card">
-          <p className="metric-label">Confirmed Orders</p>
-          <p className="metric-value">{confirmedCount}</p>
-        </article>
-      </section>
-
-      <main className="layout">
-        <section className="panel products-panel">
-          <div className="panel-heading">
-            <h2>Live Drop Catalog</h2>
-            <p>Search, sort, and stage products before queue dispatch.</p>
+      {/* Metric strip */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 mb-8">
+        {[
+          { label: "Products Live", value: products.length },
+          { label: "Results", value: filteredProducts.length },
+          { label: "Total Units", value: totalStock.toLocaleString() },
+          { label: "Low Stock", value: lowStockCount },
+          { label: "Cart Units", value: cartUnits },
+          { label: "Pending Jobs", value: pendingCount },
+          { label: "Confirmed", value: confirmedCount },
+        ].map((m) => (
+          <div key={m.label} className="glass-card rounded-lg p-4 text-center">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-1">
+              {m.label}
+            </p>
+            <p className="font-headline text-2xl font-bold text-primary">
+              {m.value}
+            </p>
           </div>
+        ))}
+      </div>
 
-          <div className="catalog-toolbar">
-            <label className="field toolbar-field" htmlFor="catalog-search">
-              Search Products
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        {/* Product grid */}
+        <section className="lg:col-span-8">
+          {/* Search + sort toolbar */}
+          <div className="glass-card rounded-xl p-4 flex flex-col md:flex-row gap-3 mb-6">
+            <div className="relative flex-grow">
+              <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant text-xl">
+                search
+              </span>
               <input
                 id="catalog-search"
+                className="input-field pl-12"
                 value={searchQuery}
-                placeholder="Search by name or SKU"
-                onChange={(event) => {
-                  setSearchQuery(event.target.value);
-                }}
+                placeholder="Search by name or SKU…"
+                onChange={(e) => setSearchQuery(e.target.value)}
               />
-            </label>
-
-            <label
-              className="field toolbar-field toolbar-sort"
-              htmlFor="catalog-sort"
-            >
-              Sort By
+            </div>
+            <div className="relative w-full md:w-48">
               <select
                 id="catalog-sort"
+                className="input-field appearance-none pr-10"
                 value={sortOption}
-                onChange={(event) => {
-                  setSortOption(event.target.value as SortOption);
-                }}
+                onChange={(e) => setSortOption(e.target.value as SortOption)}
               >
-                {sortOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
+                {sortOptions.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
                   </option>
                 ))}
               </select>
-            </label>
+              <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant">
+                expand_more
+              </span>
+            </div>
           </div>
 
-          <div className="catalog-meta">
-            <p>{filteredProducts.length} product(s) visible.</p>
-            <p>{lowStockCount} SKU(s) in critical stock range.</p>
-          </div>
+          <p className="text-xs text-on-surface-variant mb-4">
+            {filteredProducts.length} product(s) · {lowStockCount} SKU(s) in
+            critical range
+          </p>
 
-          {productsLoading ? (
-            <p className="soft-message">Loading products...</p>
-          ) : null}
-          {productsError ? (
-            <p className="error-message">{productsError}</p>
-          ) : null}
-          {!productsLoading &&
-          !productsError &&
-          filteredProducts.length === 0 ? (
-            <p className="soft-message">
-              No products match the current search.
+          {productsLoading && (
+            <div className="flex items-center justify-center py-16 text-on-surface-variant gap-3">
+              <span className="material-symbols-outlined animate-spin text-primary">
+                progress_activity
+              </span>
+              Loading products…
+            </div>
+          )}
+          {productsError && (
+            <p className="text-sm text-error font-medium bg-error/5 rounded-lg px-4 py-3 mb-4">
+              {productsError}
             </p>
-          ) : null}
+          )}
+          {!productsLoading &&
+            !productsError &&
+            filteredProducts.length === 0 && (
+              <p className="text-on-surface-variant text-center py-12">
+                No products match the current search.
+              </p>
+            )}
 
-          <div className="product-grid">
-            {filteredProducts.map((product, index) => {
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {filteredProducts.map((product) => {
               const isSoldOut = product.stock <= 0;
               const selectedQuantity = clampQuantity(
                 quantityByProduct[product.id] ?? 1,
               );
               const quantityExceedsStock = selectedQuantity > product.stock;
               const cartQuantity = cartQuantityMap.get(product.id) ?? 0;
-              const cardStyle = { "--stagger": `${index}` } as CSSProperties;
               const urgency = getUrgencyMeta(product.stock);
 
               return (
                 <article
-                  className="product-card"
                   key={product.id}
-                  style={cardStyle}
+                  className={`glass-card rounded-[24px] overflow-hidden hover:scale-[1.02] transition-all duration-500 ${isSoldOut ? "opacity-60" : ""}`}
                 >
-                  <div className="product-header">
-                    <h3>{product.name}</h3>
-                    <span
-                      className={`stock-tag ${isSoldOut ? "stock-sold-out" : "stock-live"}`}
-                    >
-                      {isSoldOut ? "Sold Out" : `${product.stock} left`}
+                  {/* Product colour band */}
+                  <div className="h-32 bg-gradient-to-br from-primary-fixed to-secondary-container flex items-center justify-center relative">
+                    <span className="font-headline text-5xl font-bold text-primary/20 select-none">
+                      {product.name.charAt(0)}
                     </span>
-                  </div>
-
-                  <div className="product-signal-row">
-                    <span className={`signal-chip signal-${urgency.tone}`}>
+                    {/* Stock badge */}
+                    <div
+                      className={`absolute top-3 right-3 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${urgencyClasses[urgency.tone] ?? ""}`}
+                    >
                       {urgency.label}
-                    </span>
-                    {cartQuantity > 0 ? (
-                      <span className="cart-chip">Cart {cartQuantity}</span>
-                    ) : null}
+                    </div>
+                    {cartQuantity > 0 && (
+                      <div className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-primary text-white text-[10px] font-bold">
+                        In Cart: {cartQuantity}
+                      </div>
+                    )}
                   </div>
 
-                  <p className="sku">SKU: {product.sku}</p>
-                  <p className="price">{toCurrency(product.priceCents)}</p>
+                  <div className="p-5 space-y-3">
+                    <div className="flex justify-between items-start gap-2">
+                      <div>
+                        <Link
+                          to={`/products/${product.id}`}
+                          className="font-headline text-base font-bold text-on-surface leading-snug hover:text-primary transition-colors"
+                        >
+                          {product.name}
+                        </Link>
+                        <p className="text-[10px] text-outline font-medium tracking-tighter mt-0.5">
+                          SKU: {product.sku}
+                        </p>
+                      </div>
+                      <p className="font-headline text-lg font-bold text-primary whitespace-nowrap">
+                        {toCurrency(product.priceCents)}
+                      </p>
+                    </div>
 
-                  <label className="qty-control" htmlFor={`qty-${product.id}`}>
-                    Quantity
-                    <input
-                      id={`qty-${product.id}`}
-                      type="number"
-                      min={1}
-                      max={10}
-                      value={quantityByProduct[product.id] ?? 1}
-                      onChange={(event) => {
-                        setQuantityByProduct((previous) => ({
-                          ...previous,
-                          [product.id]: clampQuantity(
-                            Number(event.target.value),
-                          ),
-                        }));
-                      }}
-                    />
-                  </label>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-on-surface-variant">
+                        Stock:{" "}
+                        <span className="font-bold text-on-surface">
+                          {isSoldOut
+                            ? "Sold Out"
+                            : product.stock.toLocaleString()}
+                        </span>
+                      </span>
+                      <div className="flex items-center bg-surface-container-low rounded-lg p-1 gap-1">
+                        <button
+                          className="w-7 h-7 flex items-center justify-center hover:bg-white rounded transition-colors text-lg font-bold"
+                          onClick={() =>
+                            setQuantityByProduct((p) => ({
+                              ...p,
+                              [product.id]: clampQuantity(
+                                (p[product.id] ?? 1) - 1,
+                              ),
+                            }))
+                          }
+                        >
+                          −
+                        </button>
+                        <input
+                          id={`qty-${product.id}`}
+                          type="number"
+                          min={1}
+                          max={10}
+                          className="w-8 text-center font-bold bg-transparent border-none outline-none text-sm"
+                          value={quantityByProduct[product.id] ?? 1}
+                          onChange={(e) =>
+                            setQuantityByProduct((p) => ({
+                              ...p,
+                              [product.id]: clampQuantity(
+                                Number(e.target.value),
+                              ),
+                            }))
+                          }
+                        />
+                        <button
+                          className="w-7 h-7 flex items-center justify-center hover:bg-white rounded transition-colors text-lg font-bold"
+                          onClick={() =>
+                            setQuantityByProduct((p) => ({
+                              ...p,
+                              [product.id]: clampQuantity(
+                                (p[product.id] ?? 1) + 1,
+                              ),
+                            }))
+                          }
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
 
-                  {quantityExceedsStock && !isSoldOut ? (
-                    <p className="error-message inline-error">
-                      Requested quantity exceeds live stock.
-                    </p>
-                  ) : (
-                    <p className="soft-message inline-note">
-                      Updated {new Date(product.updatedAt).toLocaleTimeString()}
-                    </p>
-                  )}
+                    {quantityExceedsStock && !isSoldOut && (
+                      <p className="text-xs text-error font-medium">
+                        Quantity exceeds live stock.
+                      </p>
+                    )}
 
-                  <div className="product-actions">
-                    <button
-                      className="ghost-button secondary-button"
-                      disabled={
-                        isSoldOut || quantityExceedsStock || checkouting
-                      }
-                      onClick={() => {
-                        addToCart(product);
-                      }}
-                    >
-                      Add to Cart
-                    </button>
-                    <button
-                      className="buy-button"
-                      disabled={
-                        isSoldOut ||
-                        quantityExceedsStock ||
-                        placingProductId === product.id ||
-                        checkouting
-                      }
-                      onClick={() => {
-                        void quickQueueOrder(product);
-                      }}
-                    >
-                      {placingProductId === product.id
-                        ? "Dispatching..."
-                        : "Quick Queue"}
-                    </button>
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        className="btn-secondary flex-1 !py-2.5 !text-xs flex items-center justify-center gap-1"
+                        disabled={
+                          isSoldOut || quantityExceedsStock || checkouting
+                        }
+                        onClick={() => addToCart(product)}
+                      >
+                        <span className="material-symbols-outlined text-base">
+                          add_shopping_cart
+                        </span>
+                        Add to Cart
+                      </button>
+                      <button
+                        className="btn-primary flex-1 !py-2.5 !text-xs flex items-center justify-center gap-1"
+                        disabled={
+                          isSoldOut ||
+                          quantityExceedsStock ||
+                          placingProductId === product.id ||
+                          checkouting
+                        }
+                        onClick={() => {
+                          void quickQueueOrder(product);
+                        }}
+                      >
+                        <span className="material-symbols-outlined text-base">
+                          bolt
+                        </span>
+                        {placingProductId === product.id
+                          ? "Dispatching…"
+                          : "Quick Queue"}
+                      </button>
+                    </div>
                   </div>
                 </article>
               );
@@ -1043,233 +1133,278 @@ function MarketplacePage() {
           </div>
         </section>
 
-        <aside className="sidebar-stack">
-          <section className="panel cart-panel">
-            <div className="panel-heading">
-              <h2>Dispatch Cart</h2>
-              <p>Bundle multiple SKUs and queue them in one checkout flow.</p>
-            </div>
+        {/* Sidebar */}
+        <aside className="lg:col-span-4 space-y-6">
+          <div className="sticky top-24 space-y-6">
+            {/* Cart panel */}
+            <div className="glass-card rounded-[24px] p-6">
+              <div className="flex items-center justify-between mb-5 pb-4 border-b border-outline-variant/10">
+                <h2 className="font-headline text-lg font-bold flex items-center gap-2">
+                  <span className="material-symbols-outlined text-primary">
+                    shopping_cart
+                  </span>
+                  Dispatch Cart
+                </h2>
+                <span className="bg-primary-fixed text-on-primary-fixed px-2 py-0.5 rounded text-xs font-bold">
+                  {cart.length} line{cart.length !== 1 ? "s" : ""}
+                </span>
+              </div>
 
-            <label className="field" htmlFor="user-id">
-              Shopper ID
-              <input
-                id="user-id"
-                value={userId}
-                disabled={Boolean(user)}
-                onChange={(event) => {
-                  setUserId(event.target.value);
-                }}
-              />
-            </label>
+              {/* Shopper ID */}
+              <div className="relative mb-4">
+                <label className="absolute -top-2.5 left-4 px-2 bg-white/90 text-primary text-[10px] font-bold uppercase tracking-widest z-10 rounded">
+                  Shopper ID
+                </label>
+                <input
+                  id="user-id"
+                  className="input-field !py-2.5 text-sm"
+                  value={userId}
+                  disabled={Boolean(user)}
+                  onChange={(e) => setUserId(e.target.value)}
+                />
+              </div>
 
-            <div className="cart-summary-grid">
-              <article className="summary-block">
-                <p className="metric-label">Cart Lines</p>
-                <p className="summary-value">{cart.length}</p>
-              </article>
-              <article className="summary-block">
-                <p className="metric-label">Units</p>
-                <p className="summary-value">{cartUnits}</p>
-              </article>
-              <article className="summary-block">
-                <p className="metric-label">Cart Value</p>
-                <p className="summary-value">{toCurrency(cartValueCents)}</p>
-              </article>
-            </div>
-
-            {invalidCartCount > 0 ? (
-              <p className="error-message">
-                Adjust {invalidCartCount} cart line(s) before checkout. Each
-                line must stay within live stock and 10 units.
-              </p>
-            ) : null}
-
-            <ul className="cart-list">
-              {cartEntries.length === 0 ? (
-                <li className="soft-message">
-                  Cart is empty. Add products from the catalog to start a
-                  multi-item checkout.
-                </li>
-              ) : null}
-
-              {cartEntries.map(({ item, product }) => {
-                const unavailable = !product || product.stock <= 0;
-                const overStock = Boolean(
-                  product && item.quantity > product.stock,
-                );
-                const invalid = unavailable || overStock;
-
-                return (
-                  <li
-                    className={`cart-item ${invalid ? "cart-item-invalid" : ""}`}
-                    key={item.productId}
+              {/* Cart summary */}
+              <div className="grid grid-cols-3 gap-2 mb-4">
+                {[
+                  { label: "Lines", value: cart.length },
+                  { label: "Units", value: cartUnits },
+                  { label: "Value", value: toCurrency(cartValueCents) },
+                ].map((s) => (
+                  <div
+                    key={s.label}
+                    className="bg-surface-container-low rounded-lg p-2 text-center"
                   >
-                    <div className="cart-item-head">
-                      <div>
-                        <p className="cart-item-name">
-                          {product?.name ?? "Unavailable product"}
-                        </p>
-                        <p className="sku">
-                          SKU: {product?.sku ?? compactValue(item.productId, 8)}
-                        </p>
-                      </div>
-                      <button
-                        className="mini-button"
-                        onClick={() => {
-                          removeFromCart(item.productId);
-                        }}
-                      >
-                        Remove
-                      </button>
-                    </div>
+                    <p className="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">
+                      {s.label}
+                    </p>
+                    <p className="font-headline text-sm font-bold text-primary mt-0.5">
+                      {s.value}
+                    </p>
+                  </div>
+                ))}
+              </div>
 
-                    <div className="cart-item-meta">
-                      <span>
-                        {product
-                          ? toCurrency(product.priceCents)
-                          : "Unavailable"}
-                      </span>
-                      <span>
-                        {product ? `${product.stock} live` : "Missing"}
-                      </span>
-                    </div>
+              {invalidCartCount > 0 && (
+                <p className="text-xs text-error font-medium bg-error/5 rounded px-3 py-2 mb-3">
+                  Adjust {invalidCartCount} line(s) before checkout.
+                </p>
+              )}
 
-                    <div className="cart-item-controls">
-                      <label
-                        className="field compact-field"
-                        htmlFor={`cart-qty-${item.productId}`}
-                      >
-                        Qty
-                        <input
-                          id={`cart-qty-${item.productId}`}
-                          type="number"
-                          min={1}
-                          max={10}
-                          value={item.quantity}
-                          onChange={(event) => {
-                            updateCartQuantity(
-                              item.productId,
-                              Number(event.target.value),
-                            );
-                          }}
-                        />
-                      </label>
-
-                      <p className="line-total">
-                        {product
-                          ? toCurrency(product.priceCents * item.quantity)
-                          : "--"}
-                      </p>
-                    </div>
-
-                    {invalid ? (
-                      <p className="error-message cart-inline-error">
-                        {unavailable
-                          ? "This product is no longer available for checkout."
-                          : `Only ${product?.stock ?? 0} unit(s) are currently live.`}
-                      </p>
-                    ) : null}
+              {/* Cart items */}
+              <ul className="space-y-3 mb-4 max-h-64 overflow-y-auto">
+                {cartEntries.length === 0 ? (
+                  <li className="text-sm text-on-surface-variant text-center py-6">
+                    Cart is empty. Add products from the catalog.
                   </li>
-                );
-              })}
-            </ul>
+                ) : null}
+                {cartEntries.map(({ item, product }) => {
+                  const unavailable = !product || product.stock <= 0;
+                  const overStock = Boolean(
+                    product && item.quantity > product.stock,
+                  );
+                  const invalid = unavailable || overStock;
+                  return (
+                    <li
+                      key={item.productId}
+                      className={`rounded-lg p-3 ${invalid ? "bg-error/5 border border-error/20" : "bg-surface-container-low"}`}
+                    >
+                      <div className="flex items-start justify-between gap-2 mb-1">
+                        <div>
+                          <p className="text-sm font-semibold text-on-surface leading-snug">
+                            {product?.name ?? "Unavailable"}
+                          </p>
+                          <p className="text-[10px] text-outline">
+                            {product?.sku ?? compactValue(item.productId, 8)}
+                          </p>
+                        </div>
+                        <button
+                          className="text-error hover:scale-110 transition-transform flex-shrink-0"
+                          onClick={() => removeFromCart(item.productId)}
+                        >
+                          <span className="material-symbols-outlined text-lg">
+                            delete
+                          </span>
+                        </button>
+                      </div>
+                      <div className="flex items-center justify-between text-xs text-on-surface-variant mt-1">
+                        <span>
+                          {product ? toCurrency(product.priceCents) : "—"} ·{" "}
+                          {product ? `${product.stock} live` : "missing"}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <span className="font-label">Qty:</span>
+                          <input
+                            id={`cart-qty-${item.productId}`}
+                            type="number"
+                            min={1}
+                            max={10}
+                            className="w-12 text-center text-xs rounded border border-outline-variant/30 bg-white px-1 py-0.5"
+                            value={item.quantity}
+                            onChange={(e) =>
+                              updateCartQuantity(
+                                item.productId,
+                                Number(e.target.value),
+                              )
+                            }
+                          />
+                          <span className="font-bold text-primary">
+                            {product
+                              ? toCurrency(product.priceCents * item.quantity)
+                              : "—"}
+                          </span>
+                        </div>
+                      </div>
+                      {invalid && (
+                        <p className="text-[10px] text-error mt-1">
+                          {unavailable
+                            ? "No longer available."
+                            : `Only ${product?.stock ?? 0} unit(s) live.`}
+                        </p>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
 
-            <div className="cart-actions">
-              <button
-                className="ghost-button secondary-button"
-                disabled={cart.length === 0 || checkouting}
-                onClick={clearCart}
-              >
-                Clear Cart
-              </button>
-              <button
-                className="buy-button"
-                disabled={
-                  cart.length === 0 || invalidCartCount > 0 || checkouting
-                }
-                onClick={() => {
-                  void checkoutCart();
-                }}
-              >
-                {checkouting
-                  ? `Dispatching ${cart.length} lines...`
-                  : "Checkout Cart"}
-              </button>
+              {/* Address selector — only shown when logged in with saved addresses */}
+              {user && addresses.length > 0 && (
+                <div className="relative mb-3">
+                  <label className="absolute -top-2.5 left-4 px-2 bg-white/90 text-primary text-[10px] font-bold uppercase tracking-widest z-10 rounded">
+                    Ship To
+                  </label>
+                  <select
+                    className="input-field !py-2.5 text-sm appearance-none pr-8 w-full"
+                    value={selectedAddressId}
+                    onChange={(e) => setSelectedAddressId(e.target.value)}
+                  >
+                    <option value="">— No address —</option>
+                    {addresses.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.fullName} · {a.line1}, {a.city}
+                        {a.isDefault ? " (Default)" : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {user && addresses.length === 0 && (
+                <p className="text-[10px] text-on-surface-variant mb-3">
+                  <a href="/profile" className="text-primary hover:underline">Add a shipping address</a> to attach delivery info to orders.
+                </p>
+              )}
+
+              <div className="flex gap-2">
+                <button
+                  className="btn-secondary flex-1 !py-3 !text-xs"
+                  disabled={cart.length === 0 || checkouting}
+                  onClick={clearCart}
+                >
+                  Clear
+                </button>
+                <button
+                  className="btn-primary flex-1 !py-3 !text-xs"
+                  disabled={
+                    cart.length === 0 || invalidCartCount > 0 || checkouting
+                  }
+                  onClick={() => {
+                    void checkoutCart();
+                  }}
+                >
+                  {checkouting
+                    ? `Dispatching ${cart.length}…`
+                    : "Checkout Cart"}
+                </button>
+              </div>
             </div>
-          </section>
 
-          <section className="panel relay-panel">
-            <div className="panel-heading">
-              <h2>Order Relay</h2>
-              <p>Track queue progression from request to confirmation.</p>
-            </div>
+            {/* Order relay panel */}
+            <div className="glass-card rounded-[24px] p-6">
+              <div className="flex items-center gap-2 mb-4 pb-4 border-b border-outline-variant/10">
+                <span className="material-symbols-outlined text-primary">
+                  package_2
+                </span>
+                <h2 className="font-headline text-lg font-bold">Order Relay</h2>
+              </div>
 
-            <div className="lookup-row">
-              <label className="field" htmlFor="job-id">
-                Manual Job Lookup
+              {/* Manual lookup */}
+              <div className="flex gap-2 mb-3">
                 <input
                   id="job-id"
+                  className="input-field flex-1 !py-2.5 text-sm"
                   value={lookupJobId}
-                  placeholder="e.g. 1"
-                  onChange={(event) => {
-                    setLookupJobId(event.target.value);
-                  }}
+                  placeholder="Job ID lookup…"
+                  onChange={(e) => setLookupJobId(e.target.value)}
                 />
-              </label>
-              <button
-                className="ghost-button"
-                onClick={() => {
-                  void lookupJob();
-                }}
-              >
-                Track
-              </button>
-            </div>
+                <button
+                  className="btn-secondary !px-4 !py-2.5 !text-xs whitespace-nowrap"
+                  onClick={() => {
+                    void lookupJob();
+                  }}
+                >
+                  Track
+                </button>
+              </div>
 
-            {lookupError ? (
-              <p className="error-message">{lookupError}</p>
-            ) : null}
-            <p className="active-message">{activeMessage}</p>
+              {lookupError && (
+                <p className="text-xs text-error font-medium mb-2">
+                  {lookupError}
+                </p>
+              )}
+              <p className="text-xs text-on-surface-variant italic mb-4 bg-surface-container-low rounded px-3 py-2">
+                {activeMessage}
+              </p>
 
-            <ul className="order-stream">
-              {trackedOrders.length === 0 ? (
-                <li className="soft-message">
-                  No jobs yet. Queue a single SKU or checkout the cart.
-                </li>
-              ) : null}
-
-              {trackedOrders.map((order) => {
-                const productName =
-                  productMap.get(order.productId)?.name ??
-                  compactValue(order.productId, 12);
-
-                return (
-                  <li
-                    className={`order-item tone-${toneForOrder(order.queueState, order.orderStatus)}`}
-                    key={order.jobId}
-                  >
-                    <div className="order-topline">
-                      <p>Job {order.jobId}</p>
-                      <span>{prettyState(order.queueState)}</span>
-                    </div>
-                    <p className="order-subline">
-                      Product: {productName} | Qty: {order.quantity}
-                    </p>
-                    <p className="order-subline">User: {order.userId}</p>
-                    <p className="order-subline">
-                      Idempotency: {compactValue(order.idempotencyKey)}
-                    </p>
-                    <p className="order-subline">
-                      Result: {order.orderStatus ?? "PENDING"}
-                      {order.failureReason ? ` (${order.failureReason})` : ""}
-                    </p>
+              <ul className="space-y-3 max-h-72 overflow-y-auto">
+                {trackedOrders.length === 0 ? (
+                  <li className="text-sm text-on-surface-variant text-center py-6">
+                    No jobs yet. Queue a single SKU or checkout the cart.
                   </li>
-                );
-              })}
-            </ul>
-          </section>
+                ) : null}
+                {trackedOrders.map((order) => {
+                  const tone = toneForOrder(
+                    order.queueState,
+                    order.orderStatus,
+                  );
+                  const itemSummary = order.items
+                    .map(
+                      ({ productId, quantity }) =>
+                        `${productMap.get(productId)?.name ?? compactValue(productId, 12)} x${quantity}`,
+                    )
+                    .join(", ");
+                  return (
+                    <li
+                      key={order.jobId}
+                      className={`rounded-lg p-3 border-l-4 text-xs space-y-0.5 ${orderToneClasses[tone] ?? ""}`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-headline font-bold text-sm text-on-surface">
+                          Job {order.jobId}
+                        </span>
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${urgencyClasses[tone] ?? ""}`}
+                        >
+                          {prettyState(order.queueState)}
+                        </span>
+                      </div>
+                      <p className="text-on-surface-variant">
+                        {itemSummary || "No items"}
+                      </p>
+                      <p className="text-on-surface-variant">
+                        Result:{" "}
+                        <span className="font-bold">
+                          {order.orderStatus ?? "PENDING"}
+                        </span>
+                        {order.failureReason ? ` · ${order.failureReason}` : ""}
+                      </p>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          </div>
         </aside>
-      </main>
+      </div>
     </div>
   );
 }

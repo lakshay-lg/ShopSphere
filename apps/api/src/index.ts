@@ -1,5 +1,6 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
+import rateLimit from "@fastify/rate-limit";
 import { env } from "./config.js";
 import { prisma } from "./db.js";
 import { closeIdempotencyClient } from "./idempotency.js";
@@ -8,6 +9,8 @@ import { productRoutes } from "./routes/products.js";
 import { orderRoutes } from "./routes/orders.js";
 import { authRoutes } from "./routes/auth.js";
 import { contactRoutes } from "./routes/contact.js";
+import { newsletterRoutes } from "./routes/newsletter.js";
+import { addressRoutes } from "./routes/addresses.js";
 
 const app = Fastify({
   logger: true
@@ -15,11 +18,16 @@ const app = Fastify({
 
 const start = async (): Promise<void> => {
   await app.register(cors, { origin: true });
+  await app.register(rateLimit, {
+    global: false, // opt-in per route; auth routes set their own config below
+  });
 
   await app.register(productRoutes, { prefix: "/api" });
   await app.register(orderRoutes, { prefix: "/api" });
   await app.register(authRoutes, { prefix: "/api" });
   await app.register(contactRoutes, { prefix: "/api" });
+  await app.register(newsletterRoutes, { prefix: "/api" });
+  await app.register(addressRoutes, { prefix: "/api" });
 
   app.get("/health", async () => {
     await prisma.$queryRaw`SELECT 1`;

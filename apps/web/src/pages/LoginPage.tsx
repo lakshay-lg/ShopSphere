@@ -17,7 +17,6 @@ function LoginPage() {
     setError(null);
     setStatus(null);
     setIsSubmitting(true);
-
     try {
       if (mode === "login") {
         await login(email, password);
@@ -28,9 +27,7 @@ function LoginPage() {
       }
       setPassword("");
     } catch (submitError) {
-      setError(
-        submitError instanceof Error ? submitError.message : "Request failed",
-      );
+      setError(submitError instanceof Error ? submitError.message : "Request failed");
     } finally {
       setIsSubmitting(false);
     }
@@ -38,109 +35,124 @@ function LoginPage() {
 
   if (isLoading) {
     return (
-      <section className="content-page login-page">
-        <article className="card-surface login-panel">
-          <p className="section-kicker">Authentication</p>
-          <h1>Restoring your session...</h1>
-          <p>Checking whether you already have an active ShopSphere login.</p>
-        </article>
-      </section>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4 text-on-surface-variant">
+          <span className="material-symbols-outlined text-5xl animate-spin text-primary">progress_activity</span>
+          <p className="font-label text-sm uppercase tracking-widest">Restoring session…</p>
+        </div>
+      </div>
     );
   }
 
   if (user) {
     return (
-      <section className="content-page login-page">
-        <article className="card-surface login-panel auth-success-panel">
-          <p className="section-kicker">Authentication</p>
-          <h1>You're signed in.</h1>
-          <p>
-            Logged in as <strong>{user.email}</strong>. This demo stores the
-            token locally and re-validates it with the API on reload.
+      <div className="min-h-screen flex items-center justify-center px-6">
+        <div className="glass-card rounded-xl p-10 md:p-12 w-full max-w-md text-center shadow-glass">
+          <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-6">
+            <span className="material-symbols-outlined text-3xl text-green-600">verified_user</span>
+          </div>
+          <p className="eyebrow mb-1">Authentication</p>
+          <h1 className="font-headline text-3xl font-bold mb-3">You're signed in.</h1>
+          <p className="text-on-surface-variant mb-4">
+            Logged in as <strong className="text-on-surface">{user.email}</strong>.
           </p>
-          <div className="auth-chip-row">
-            <span className="info-chip">User ID: {user.id}</span>
-            <span className="info-chip">
+          <div className="flex flex-wrap justify-center gap-2 mb-8">
+            <span className="px-3 py-1.5 rounded-full bg-surface-container text-xs font-mono text-on-surface-variant border border-outline-variant/20">
+              ID: {user.id.slice(-8)}
+            </span>
+            <span className="px-3 py-1.5 rounded-full bg-surface-container text-xs font-mono text-on-surface-variant border border-outline-variant/20">
               Joined: {new Date(user.createdAt).toLocaleDateString()}
             </span>
           </div>
-          <button className="button-secondary" type="button" onClick={logout}>
+          <button className="btn-secondary w-full" type="button" onClick={logout}>
             Log Out
           </button>
-        </article>
-      </section>
+        </div>
+      </div>
     );
   }
 
   return (
-    <section className="content-page login-page">
-      <article className="card-surface login-panel">
-        <p className="section-kicker">Authentication</p>
-        <h1>
-          {mode === "login" ? "Log in to ShopSphere" : "Create your account"}
+    <div className="min-h-screen flex items-center justify-center px-6 relative overflow-hidden">
+      {/* Background glows */}
+      <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-primary-fixed/20 blur-[120px] rounded-full -z-10 pointer-events-none"></div>
+      <div className="absolute bottom-[-10%] left-[-10%] w-[400px] h-[400px] bg-secondary-container/20 blur-[100px] rounded-full -z-10 pointer-events-none"></div>
+
+      <div className="glass-card rounded-xl p-10 md:p-12 w-full max-w-md shadow-glass">
+        <p className="eyebrow mb-1">Authentication</p>
+        <h1 className="font-headline text-3xl font-bold mb-2">
+          {mode === "login" ? "Welcome back." : "Create your account."}
         </h1>
-        <p>
-          This auth flow is now live for the demo. Register a new account or
-          sign in with an existing one to establish a client session.
+        <p className="text-on-surface-variant text-sm mb-8">
+          {mode === "login"
+            ? "Sign in to access your orders and flash drops."
+            : "Register a new account to start shopping on ShopSphere."}
         </p>
 
-        <div className="auth-toggle" role="tablist" aria-label="Auth mode">
-          <button
-            className={mode === "login" ? "button-primary" : "button-secondary"}
-            type="button"
-            onClick={() => setMode("login")}
-          >
-            Log In
-          </button>
-          <button
-            className={
-              mode === "register" ? "button-primary" : "button-secondary"
-            }
-            type="button"
-            onClick={() => setMode("register")}
-          >
-            Register
-          </button>
+        {/* Mode toggle */}
+        <div className="flex gap-2 mb-8 p-1 rounded-md bg-surface-container-low">
+          {(["login", "register"] as AuthMode[]).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setMode(m)}
+              className={`flex-1 py-2 rounded text-xs font-bold font-headline uppercase tracking-wide transition-all duration-200 ${
+                mode === m
+                  ? "bg-white text-primary shadow-sm"
+                  : "text-on-surface-variant hover:text-on-surface"
+              }`}
+            >
+              {m === "login" ? "Log In" : "Register"}
+            </button>
+          ))}
         </div>
 
-        <form className="login-form" onSubmit={handleSubmit}>
-          <label>
-            Email
+        <form className="space-y-5" onSubmit={handleSubmit}>
+          <div className="relative">
+            <label className="absolute -top-2.5 left-4 px-2 bg-white/90 text-primary text-[10px] font-bold uppercase tracking-widest z-10 rounded">
+              Email
+            </label>
             <input
               type="email"
+              className="input-field"
               placeholder="name@company.com"
               value={email}
-              onChange={(event) => setEmail(event.target.value)}
+              onChange={(e) => setEmail(e.target.value)}
               required
             />
-          </label>
-          <label>
-            Password
+          </div>
+          <div className="relative">
+            <label className="absolute -top-2.5 left-4 px-2 bg-white/90 text-primary text-[10px] font-bold uppercase tracking-widest z-10 rounded">
+              Password
+            </label>
             <input
               type="password"
+              className="input-field"
               placeholder="At least 8 characters"
               value={password}
-              onChange={(event) => setPassword(event.target.value)}
+              onChange={(e) => setPassword(e.target.value)}
               minLength={8}
               required
             />
-          </label>
-          {error ? <p className="form-error">{error}</p> : null}
-          {status ? <p className="form-success">{status}</p> : null}
+          </div>
+
+          {error && (
+            <p className="text-sm text-error font-medium bg-error/5 rounded-lg px-4 py-3">{error}</p>
+          )}
+          {status && (
+            <p className="text-sm text-green-700 font-medium bg-green-50 rounded-lg px-4 py-3">{status}</p>
+          )}
+
           <button
-            className="button-primary"
             type="submit"
             disabled={isSubmitting}
+            className="btn-primary w-full py-4 disabled:opacity-60"
           >
-            {isSubmitting
-              ? "Working..."
-              : mode === "login"
-                ? "Log In"
-                : "Create Account"}
+            {isSubmitting ? "Working…" : mode === "login" ? "Log In" : "Create Account"}
           </button>
         </form>
-      </article>
-    </section>
+      </div>
+    </div>
   );
 }
 

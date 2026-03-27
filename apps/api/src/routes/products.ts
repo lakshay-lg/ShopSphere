@@ -45,6 +45,20 @@ export const productRoutes: FastifyPluginAsync = async (app) => {
     return reply.code(201).send({ product: created });
   });
 
+  app.get("/products/:productId", async (req, reply) => {
+    const parsed = productParamsSchema.safeParse(req.params);
+    if (!parsed.success) {
+      return reply.code(400).send({ message: "Invalid product ID" });
+    }
+    const product = await prisma.product.findUnique({
+      where: { id: parsed.data.productId },
+    });
+    if (!product) {
+      return reply.code(404).send({ message: "Product not found" });
+    }
+    return { product };
+  });
+
   app.patch("/products/:productId/stock", async (req, reply) => {
     const paramsParsed = productParamsSchema.safeParse(req.params);
     const bodyParsed = updateStockSchema.safeParse(req.body);

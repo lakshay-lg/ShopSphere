@@ -129,6 +129,123 @@ export const blogPosts: BlogPost[] = [
       }
     ]
   }
+  {
+    slug: "users-auth-and-the-question-of-identity",
+    title: "Users, Auth, and the Question of Identity",
+    tag: "Security",
+    date: "March 18, 2026",
+    readTime: "6 min read",
+    excerpt:
+      "Adding real authentication to ShopSphere forced a clear-eyed look at what it means to know who someone is — and what you owe them once you do.",
+    sections: [
+      {
+        heading: "The guest era had to end",
+        paragraphs: [
+          "For a while, ShopSphere ran on the quiet fiction of a shared shopper identity. Everyone was effectively the same user. That works just long enough to prove that the queue pipeline is real, but it breaks the moment anyone asks a reasonable question like 'where are my orders?' The answer to that question requires the system to actually know who is asking.",
+          "The auth implementation followed from that requirement rather than preceding it. Register with an email and password, get a signed JWT back, include that token on every subsequent request. It is not novel technology. The interesting part was building it to production habits from the start rather than leaving the token handling as an afterthought."
+        ]
+      },
+      {
+        heading: "Rate limiting is not paranoia, it is just politeness",
+        paragraphs: [
+          "Once the register and login routes existed, the obvious next step was protecting them. The implementation uses per-route IP-based limits via `@fastify/rate-limit`, with registration capped tighter than login. This is a calibration decision as much as a security one: registration is lower frequency by nature, so a tighter ceiling does not inconvenience real users but raises the cost of automated credential stuffing meaningfully.",
+          "The constant-time comparison guard on login — running a dummy bcrypt compare even when the user is not found — deserves a mention. It eliminates the timing difference between 'email not found' and 'wrong password', which removes one side-channel that enumeration attacks rely on. Small details compound into a posture, and that detail cost almost nothing to add."
+        ]
+      },
+      {
+        heading: "The profile page as a trust signal",
+        paragraphs: [
+          "A profile page is not technically exciting. It renders what you already know about a user, lets them change their password, and lets them save shipping addresses. But it matters as a trust signal. A site that lets you create an account but offers no surface to inspect or manage it sends an implicit message about how seriously it takes that account.",
+          "The password change flow requires the current password before accepting a new one. That check should feel obvious, but it is frequently omitted. The shipping address section adds real utility by letting saved addresses pre-fill the checkout selector, which reduces friction and prevents the awkward silence of a checkout form that never remembers anything."
+        ]
+      },
+      {
+        heading: "What JWT gets right and what it offloads",
+        paragraphs: [
+          "JWT authentication is stateless by design. The server does not store sessions; it trusts cryptographically signed tokens. That is a genuine architectural advantage at scale: any API instance can verify any token without a shared session store. The trade-off is that token revocation requires extra infrastructure. For now, logout is client-side only — the token is discarded locally and expires in seven days on its own.",
+          "That is an honest trade-off for a project at this stage. The right tool for revocation is a token blocklist in Redis, which is already in the infrastructure stack. Adding it is a known next step rather than an oversight. Acknowledging the gap is more useful than pretending it does not exist."
+        ]
+      }
+    ]
+  },
+  {
+    slug: "persistence-by-design-addresses-cart-and-order-history",
+    title: "Persistence by Design: Addresses, Cart, and Order History",
+    tag: "Architecture",
+    date: "March 21, 2026",
+    readTime: "7 min read",
+    excerpt:
+      "A platform that forgets everything between page loads is not a platform. The work of deciding what to persist, where, and why turns out to be surprisingly opinionated.",
+    sections: [
+      {
+        heading: "The cart problem is deceptively simple",
+        paragraphs: [
+          "Losing a cart on page refresh is a paper cut that accumulates into real frustration. The fix is straightforward: initialize cart state from localStorage with a lazy state function, serialize it back on every change via a sync effect. Two additions, high impact. The reason it was not there from the start is that in-memory state is easier to reason about while the underlying pipeline is still being built. Once the queue flow was stable, persistence became the obvious next layer.",
+          "The same pattern was already in place for the order relay. Extending it to the cart was deliberate repetition rather than an oversight correction. The design is intentional: items you have added survive a refresh, and orders you have placed survive a tab close. Both are appropriate for their context."
+        ]
+      },
+      {
+        heading: "Shipping addresses as a first-class model",
+        paragraphs: [
+          "Adding a dedicated `ShippingAddress` model to the Prisma schema was the decision that made checkout feel real. A user can now save multiple addresses, set one as default, and have it automatically pre-selected in the marketplace checkout dropdown. The first address created becomes the default automatically; subsequent ones require an explicit action.",
+          "The backend enforces ownership on every address mutation. Set-default and delete operations both verify that the requesting user owns the address before proceeding, returning 403 otherwise. That check is easy to skip when you are moving fast, but it is the kind of gap that creates real vulnerabilities. The order creation path accepts an optional `shippingAddressId` which is passed through the queue payload and persisted on the order record."
+        ]
+      },
+      {
+        heading: "Order history as a product feature, not just a database dump",
+        paragraphs: [
+          "The order history page uses cursor-based pagination rather than offset pagination. That is not purely academic. Offset pagination degrades as the table grows and produces inconsistent results when new rows are inserted between page fetches. Cursor-based pagination is stable under concurrent writes, which matters for a platform where orders are landing continuously.",
+          "The order detail page completes the picture. It shows full item breakdown, line totals, order total, the queue job ID for traceability, and the shipping address that was attached at checkout. That last field required threading the address through the `orderWithItems` Prisma select, but it means the detail view is genuinely informative rather than a partial summary with a row ID."
+        ]
+      },
+      {
+        heading: "The product detail page closed a navigation gap",
+        paragraphs: [
+          "For a long time, product names in the marketplace grid were static text. Clicking them did nothing. Adding a dedicated `/products/:productId` route and a corresponding detail page resolved that gap without requiring changes to the ordering flow. The detail page is intentionally read-only: it shows the product, its price, its stock urgency, and a call to action that takes the user back to the marketplace to buy.",
+          "That decision avoided a hard problem — the cart lives in MarketplacePage state and sharing it across routes would require lifting it to context. The read-only approach is honest about that constraint rather than papering over it. The right way to solve it later is a cart context provider, not a workaround."
+        ]
+      }
+    ]
+  },
+  {
+    slug: "admin-controls-and-the-infrastructure-that-ties-it-together",
+    title: "Admin Controls and the Infrastructure That Ties It Together",
+    tag: "Build Log",
+    date: "March 26, 2026",
+    readTime: "5 min read",
+    excerpt:
+      "Every user-facing feature eventually generates data that someone needs to read. Building the admin layer forced a conversation about access, trust, and what it means to operate a product responsibly.",
+    sections: [
+      {
+        heading: "Contact messages needed a destination",
+        paragraphs: [
+          "The contact form had been persisting submissions to PostgreSQL since early in the build. But the data had nowhere useful to go. The `GET /api/admin/contact-messages` endpoint was the obvious completion, protected by a static `ADMIN_TOKEN` from the environment rather than the user JWT system. The choice reflects the real use case: an admin checking submissions is not a registered user browsing the store; they are an operator with a separate class of access.",
+          "The frontend admin page at `/admin` makes that endpoint actually usable. It opens with a token prompt, stores the credential in `sessionStorage` for the duration of the tab, and renders submissions as collapsible cards. Each expanded card shows the full message, sender metadata, and a reply link that opens the user's email client pre-addressed. The session clears on tab close by design."
+        ]
+      },
+      {
+        heading: "Newsletter subscriptions without the spam infrastructure",
+        paragraphs: [
+          "The newsletter subscription form on the blog page now has a real backend. The `POST /api/newsletter` endpoint upserts on the email field, which means re-subscribing is idempotent. A repeated submission returns the same success response without creating a duplicate record. That is the correct behavior regardless of whether it was the user's intention.",
+          "There is no confirmation email, no unsubscribe link, and no send infrastructure because none of those things were in scope. What does exist is a clean data model and a working capture path. Adding email delivery later is a concrete integration task, not a design problem to solve."
+        ]
+      },
+      {
+        heading: "Privacy and terms as honest documentation",
+        paragraphs: [
+          "The Privacy Policy and Terms of Service pages are not legal instruments for a live product. They are documentation artifacts that explain what the platform actually does with data: bcrypt-hashed passwords, localStorage for session tokens and cart state, PostgreSQL for orders and contact submissions. Writing them forced a useful audit of where data actually lives and how it flows through the system.",
+          "That kind of documentation pays back quickly during code review and onboarding. A reader who knows the platform uses `localStorage` key `ss_token` for auth and `ss_cart` for cart state can orient themselves in the codebase faster. The pages are also linked from the footer, which means the site can explain its data practices without requiring anyone to dig through source."
+        ]
+      },
+      {
+        heading: "Where ShopSphere stands now",
+        paragraphs: [
+          "The platform now covers the full arc from discovery to order confirmation: product browsing with detail pages, cart management with persistence, authenticated flash-sale checkout with shipping address selection, order history and detail views, user profile and password management, and an admin interface for support operations. The newsletter captures interest and the blog records the build.",
+          "The remaining gaps are known and named: email verification on registration, a forgot-password flow, token revocation, and a payment integration. Each of those is a contained addition to an architecture that was designed to support them. The foundation is honest about what it is and where it is going."
+        ]
+      }
+    ]
+  }
 ];
 
 export function getBlogPost(slug: string): BlogPost | undefined {

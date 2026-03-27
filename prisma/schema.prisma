@@ -8,32 +8,62 @@ datasource db {
 }
 
 model Product {
-  id        String   @id @default(cuid())
-  sku       String   @unique
-  name      String
+  id         String      @id @default(cuid())
+  sku        String      @unique
+  name       String
   priceCents Int
-  stock     Int
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  orders    Order[]
+  stock      Int
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  orderItems OrderItem[]
 
   @@index([name])
 }
 
-model Order {
-  id            String      @id @default(cuid())
-  queueJobId    String      @unique
-  userId        String
-  productId     String
-  quantity      Int
-  status        OrderStatus
-  failureReason String?
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+model ShippingAddress {
+  id         String   @id @default(cuid())
+  userId     String
+  fullName   String
+  line1      String
+  line2      String?
+  city       String
+  state      String
+  postalCode String
+  country    String   @default("IN")
+  isDefault  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  orders     Order[]
 
+  @@index([userId])
+}
+
+model Order {
+  id                String           @id @default(cuid())
+  queueJobId        String           @unique
+  userId            String
+  status            OrderStatus
+  failureReason     String?
+  shippingAddressId String?
+  shippingAddress   ShippingAddress? @relation(fields: [shippingAddressId], references: [id], onDelete: SetNull)
+  items             OrderItem[]
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+model OrderItem {
+  id         String @id @default(cuid())
+  orderId    String
+  productId  String
+  quantity   Int
+  priceCents Int
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
 
-  @@index([productId, createdAt(sort: Desc)])
+  @@index([orderId])
 }
 
 enum OrderStatus {
@@ -47,6 +77,14 @@ model User {
   passwordHash String
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  @@index([email])
+}
+
+model NewsletterSubscription {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  createdAt DateTime @default(now())
 
   @@index([email])
 }

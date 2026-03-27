@@ -23,81 +23,109 @@ const processOrder = async (job: Job<FlashSaleOrderJob>): Promise<void> => {
   }
 
   const queueJobId = String(job.id);
-  const { productId, quantity, userId } = job.data;
+  const { userId, items, shippingAddressId } = job.data;
 
-  const lockKey = `lock:product:${productId}`;
-  const lockToken = crypto.randomUUID();
+  // Sort by productId for consistent lock acquisition order (deadlock prevention)
+  const sortedItems = [...items].sort((a, b) => a.productId.localeCompare(b.productId));
 
-  const lockAcquired = await acquireLockWithRetry(workerConnection, lockKey, lockToken);
+  // Acquire a lock per unique product
+  const lockTokens = new Map<string, string>();
 
-  if (!lockAcquired) {
-    throw new Error(`Could not acquire lock for product ${productId}`);
+  for (const { productId } of sortedItems) {
+    if (lockTokens.has(productId)) continue;
+
+    const lockKey = `lock:product:${productId}`;
+    const lockToken = crypto.randomUUID();
+    const acquired = await acquireLockWithRetry(workerConnection, lockKey, lockToken);
+
+    if (!acquired) {
+      // Release any locks already held before throwing
+      for (const [pid, token] of lockTokens) {
+        await releaseLockSafely(workerConnection, `lock:product:${pid}`, token);
+      }
+      throw new Error(`Could not acquire lock for product ${productId}`);
+    }
+
+    lockTokens.set(productId, lockToken);
   }
 
   try {
     await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      const existing = await tx.order.findUnique({
-        where: {
-          queueJobId
-        }
-      });
+      // Idempotency: if this job was already processed, skip
+      const existing = await tx.order.findUnique({ where: { queueJobId } });
+      if (existing) return;
 
-      if (existing) {
-        return;
+      // Fetch current stock + price snapshot for all products in one pass
+      const productRows = await Promise.all(
+        sortedItems.map(({ productId }) =>
+          tx.product.findUnique({
+            where: { id: productId },
+            select: { id: true, stock: true, priceCents: true },
+          })
+        )
+      );
+
+      // Verify all products exist
+      for (let i = 0; i < sortedItems.length; i++) {
+        if (!productRows[i]) {
+          const pid = sortedItems[i]?.productId ?? "unknown";
+          throw new Error(`Product ${pid} not found while processing order ${queueJobId}`);
+        }
       }
 
-      const product = await tx.product.findUnique({
-        where: {
-          id: productId
-        },
-        select: {
-          id: true,
-          stock: true
-        }
+      const productMap = new Map(
+        productRows.map((p) => [p!.id, { stock: p!.stock, priceCents: p!.priceCents }])
+      );
+
+      // Find first item with insufficient stock
+      const insufficientItem = sortedItems.find(({ productId, quantity }) => {
+        return (productMap.get(productId)?.stock ?? 0) < quantity;
       });
 
-      if (!product) {
-        throw new Error(`Product ${productId} not found while processing order ${queueJobId}`);
-      }
-
-      if (product.stock < quantity) {
+      if (insufficientItem) {
         await tx.order.create({
           data: {
             queueJobId,
             userId,
-            productId,
-            quantity,
             status: "FAILED",
-            failureReason: "INSUFFICIENT_STOCK"
-          }
+            failureReason: `INSUFFICIENT_STOCK:${insufficientItem.productId}`,
+            shippingAddressId: shippingAddressId ?? null,
+          },
         });
-
         return;
       }
 
-      await tx.product.update({
-        where: {
-          id: productId
-        },
-        data: {
-          stock: {
-            decrement: quantity
-          }
-        }
-      });
+      // Decrement stock for all items
+      await Promise.all(
+        sortedItems.map(({ productId, quantity }) =>
+          tx.product.update({
+            where: { id: productId },
+            data: { stock: { decrement: quantity } },
+          })
+        )
+      );
 
+      // Create confirmed order with all line items (price snapshot included)
       await tx.order.create({
         data: {
           queueJobId,
           userId,
-          productId,
-          quantity,
-          status: "CONFIRMED"
-        }
+          status: "CONFIRMED",
+          shippingAddressId: shippingAddressId ?? null,
+          items: {
+            create: sortedItems.map(({ productId, quantity }) => ({
+              productId,
+              quantity,
+              priceCents: productMap.get(productId)!.priceCents,
+            })),
+          },
+        },
       });
     });
   } finally {
-    await releaseLockSafely(workerConnection, lockKey, lockToken);
+    for (const [productId, token] of lockTokens) {
+      await releaseLockSafely(workerConnection, `lock:product:${productId}`, token);
+    }
   }
 };
 

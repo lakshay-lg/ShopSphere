@@ -4,11 +4,12 @@ High-concurrency flash-commerce platform with a queue-first ordering pipeline, R
 
 ## Highlights
 
-- Fastify API with catalog, flash-sale ordering, auth, addresses, newsletter, contact, and admin endpoints
+- Fastify API with catalog, flash-sale ordering, payments, auth, addresses, newsletter, contact, and admin endpoints
+- Razorpay payment integration — server-side order creation, client-side checkout modal, HMAC signature verification before enqueue
 - BullMQ queue + worker for asynchronous order processing under burst traffic
 - Redis idempotency key reservation to prevent duplicate order enqueueing
 - Redis stock lock (`SET NX PX`) with safe release to reduce oversell races
-- PostgreSQL + Prisma for persistent products, orders, users, shipping addresses, contact messages, and newsletter subscriptions
+- PostgreSQL + Prisma for persistent products, orders (with payment IDs), users, shipping addresses, contact messages, and newsletter subscriptions
 - React + Vite frontend with full route-based site shell and marketplace UX
 - JWT-based auth with bcrypt password hashing and per-route rate limiting
 - User profile with password change and shipping address management
@@ -166,6 +167,16 @@ pnpm dev:all
 - `POST /api/products`
 - `PATCH /api/products/:productId/stock`
 
+### Payments
+
+- `POST /api/payments/create-order` — creates a Razorpay order; returns `orderId`, `amount`, `keyId` for the frontend checkout modal
+
+```bash
+curl -X POST http://localhost:3000/api/payments/create-order \
+  -H "Content-Type: application/json" \
+  -d '{"amountCents": 99900, "receipt": "order-ref-001"}'
+```
+
 ### Flash-Sale Orders
 
 - `POST /api/flash-sale/order` — requires `Idempotency-Key` header and Bearer token
@@ -303,4 +314,5 @@ pnpm compose:down
 - JWT signing uses `JWT_SECRET` from environment; tokens expire after 7 days
 - Register is rate-limited to 5 attempts/min per IP; login to 10 attempts/min
 - Admin contact endpoint is protected by a separate `ADMIN_TOKEN` env var
+- Razorpay payment signatures are verified server-side using HMAC-SHA256 with `RAZORPAY_KEY_SECRET` before any order is enqueued — client-side tampering cannot bypass stock deduction
 - Do not commit real `.env` values; only `.env.example` should be tracked

@@ -121,10 +121,10 @@ export const blogPosts: BlogPost[] = [
         ]
       },
       {
-        heading: "What comes next",
+        heading: "What came next",
         paragraphs: [
-          "Now that auth, contact submission, content pages, and a more expressive fallback experience are in place, the next frontier is operational depth: payment flows, persistent user order history, observability, and admin controls. Those are less visible than a homepage redesign, but they are what turn a coherent demo into something deployment-adjacent.",
-          "The site is closer now to feeling established rather than assembled. That is a meaningful milestone, especially for a project that began as a storefront and quickly became a systems narrative."
+          "Now that auth, contact submission, content pages, and a more expressive fallback experience were in place, the next frontier was operational depth: payment flows, persistent user order history, observability, and admin controls. Those are less visible than a homepage redesign, but they are what turn a coherent demo into something deployment-adjacent.",
+          "All of those have since landed. Order history, shipping address management, admin controls, and a full Razorpay payment integration are now part of the platform. The site has moved from feeling assembled to feeling established — which was always the real milestone, especially for a project that began as a storefront and quietly became a systems narrative."
         ]
       }
     ]
@@ -240,8 +240,54 @@ export const blogPosts: BlogPost[] = [
       {
         heading: "Where ShopSphere stands now",
         paragraphs: [
-          "The platform now covers the full arc from discovery to order confirmation: product browsing with detail pages, cart management with persistence, authenticated flash-sale checkout with shipping address selection, order history and detail views, user profile and password management, and an admin interface for support operations. The newsletter captures interest and the blog records the build.",
-          "The remaining gaps are known and named: email verification on registration, a forgot-password flow, token revocation, and a payment integration. Each of those is a contained addition to an architecture that was designed to support them. The foundation is honest about what it is and where it is going."
+          "The platform covers the full arc from discovery to paid order confirmation: product browsing with detail pages, cart management with persistence, Razorpay-gated flash-sale checkout with shipping address selection, order history and detail views, user profile and password management, and an admin interface for support operations. The newsletter captures interest and the blog records the build.",
+          "The remaining gaps are the ones that require external infrastructure to be meaningful: email verification on registration, a forgot-password flow, and token revocation. Each is a contained addition to an architecture that was designed to support them. The foundation is honest about what it is and where it is going."
+        ]
+      }
+    ]
+  },
+  {
+    slug: "payment-processing-and-the-problem-of-trust",
+    title: "Payment Processing and the Problem of Trust",
+    tag: "Architecture",
+    date: "March 29, 2026",
+    readTime: "6 min read",
+    excerpt:
+      "Integrating a payment gateway is less about the API call and more about deciding where trust lives in your system — and making sure nothing can bypass it.",
+    sections: [
+      {
+        heading: "The gap that made checkout feel incomplete",
+        paragraphs: [
+          "ShopSphere had a working checkout pipeline before payment was integrated. You could queue an order, watch it processed by the worker, and see a confirmed status land in the database. The system was technically coherent. But it was also missing the most fundamental thing a commerce platform is supposed to do: actually exchange value. Without payment, the checkout button was a demonstration rather than a transaction.",
+          "Adding Razorpay was the natural next step. The requirement was not just to display a payment form — it was to integrate payment into the existing queue-backed flow in a way that was honest about the trust model. That meant thinking carefully about where verification happened and what could not be bypassed."
+        ]
+      },
+      {
+        heading: "Server-side order creation is not optional",
+        paragraphs: [
+          "The Razorpay integration starts with a server-side call. When the user initiates checkout, the frontend first requests a Razorpay order from the API via `POST /api/payments/create-order`. The API creates the order with the correct amount and returns an `orderId` alongside the public key. The frontend then opens the Razorpay checkout modal using those values.",
+          "This sequence matters because it means the amount cannot be set by the client. A frontend-only integration that passes the amount directly to the checkout modal is trivially exploitable — anyone with browser devtools can change the number. Having the server create the order with the authoritative price from the database closes that hole before it can be opened."
+        ]
+      },
+      {
+        heading: "HMAC signature verification before anything happens",
+        paragraphs: [
+          "After the user completes payment, Razorpay returns three values to the client: `razorpay_order_id`, `razorpay_payment_id`, and `razorpay_signature`. The signature is an HMAC-SHA256 hash of `orderId|paymentId` using the Razorpay key secret as the signing key. It exists specifically to let the server confirm that the payment response is genuine and unmodified.",
+          "The flash-sale order endpoint now requires all three values. Before the idempotency check, before the product existence check, before anything is enqueued, the API verifies the signature using `crypto.timingSafeEqual`. If it does not match, the request is rejected with a 400. There is no code path that allows a confirmed order to be created without a valid payment signature. The queue worker then persists both `razorpayOrderId` and `razorpayPaymentId` on the order record, so every confirmed or failed order carries its payment provenance."
+        ]
+      },
+      {
+        heading: "Fitting payment into an existing concurrency model",
+        paragraphs: [
+          "The existing checkout flow had already solved the hard concurrency problems: idempotency key reservation, Redis stock locks with safe release, deadlock prevention via sorted product IDs, and atomic Prisma transactions. Payment verification slots in cleanly before the queue enqueue step without touching any of that machinery.",
+          "The sequencing is: payment verified → idempotency key reserved → job enqueued → worker acquires locks → transaction commits. Each stage has a single responsibility. Payment is the trust gate. Everything after it operates on the assumption that the payment was real. Keeping those concerns separate made the integration straightforward and kept the worker logic unchanged."
+        ]
+      },
+      {
+        heading: "Test mode and what it actually tests",
+        paragraphs: [
+          "Razorpay's test mode is a complete sandbox. Test card numbers, hardcoded OTPs, and synthetic payment IDs let the full flow run end-to-end without moving any real money. That includes signature generation — the HMAC is computed with the real key secret against the test payment ID, so the verification logic is exercised identically to production.",
+          "The only thing test mode does not cover is failure recovery from real payment network errors. But the platform's failure model is already explicit: a payment that does not complete never reaches the order queue, and a queued order that fails stock validation records a failure reason and preserves the payment IDs for audit. The happy path and the known failure path both leave a clean trail."
         ]
       }
     ]

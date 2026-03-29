@@ -13,7 +13,9 @@ const envSchema = z.object({
   ORDER_LOCK_RETRY_ATTEMPTS: z.coerce.number().int().positive().default(20),
   ORDER_LOCK_RETRY_DELAY_MS: z.coerce.number().int().positive().default(30),
   JWT_SECRET: z.string().min(1).default("dev-secret-change-in-production-32chars!"),
-  ADMIN_TOKEN: z.string().min(1).default("dev-admin-token-change-in-production")
+  ADMIN_TOKEN: z.string().min(1).default("dev-admin-token-change-in-production"),
+  RAZORPAY_KEY_ID: z.string().min(1).default("rzp_test_placeholder"),
+  RAZORPAY_KEY_SECRET: z.string().min(1).default("placeholder_secret")
 });
 
 export const env = envSchema.parse(process.env);

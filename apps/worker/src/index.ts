@@ -23,7 +23,7 @@ const processOrder = async (job: Job<FlashSaleOrderJob>): Promise<void> => {
   }
 
   const queueJobId = String(job.id);
-  const { userId, items, shippingAddressId } = job.data;
+  const { userId, items, shippingAddressId, razorpayOrderId, razorpayPaymentId } = job.data;
 
   // Sort by productId for consistent lock acquisition order (deadlock prevention)
   const sortedItems = [...items].sort((a, b) => a.productId.localeCompare(b.productId));
@@ -90,6 +90,8 @@ const processOrder = async (job: Job<FlashSaleOrderJob>): Promise<void> => {
             status: "FAILED",
             failureReason: `INSUFFICIENT_STOCK:${insufficientItem.productId}`,
             shippingAddressId: shippingAddressId ?? null,
+            razorpayOrderId: razorpayOrderId ?? null,
+            razorpayPaymentId: razorpayPaymentId ?? null,
           },
         });
         return;
@@ -112,6 +114,8 @@ const processOrder = async (job: Job<FlashSaleOrderJob>): Promise<void> => {
           userId,
           status: "CONFIRMED",
           shippingAddressId: shippingAddressId ?? null,
+          razorpayOrderId: razorpayOrderId ?? null,
+          razorpayPaymentId: razorpayPaymentId ?? null,
           items: {
             create: sortedItems.map(({ productId, quantity }) => ({
               productId,

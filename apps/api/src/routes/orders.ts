@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { enqueueOrderSchema } from "@shopsphere/shared";
 import { z } from "zod";
@@ -10,6 +11,22 @@ import {
   reserveIdempotencyKey
 } from "../idempotency.js";
 import { enqueueFlashSaleOrder, orderQueue } from "../queue.js";
+
+const verifyRazorpaySignature = (
+  razorpayOrderId: string,
+  razorpayPaymentId: string,
+  signature: string
+): boolean => {
+  const body = `${razorpayOrderId}|${razorpayPaymentId}`;
+  const expectedSignature = crypto
+    .createHmac("sha256", env.RAZORPAY_KEY_SECRET)
+    .update(body)
+    .digest("hex");
+  return crypto.timingSafeEqual(
+    Buffer.from(expectedSignature, "hex"),
+    Buffer.from(signature, "hex")
+  );
+};
 
 const jobParamsSchema = z.object({
   jobId: z.string().min(1)
@@ -75,6 +92,12 @@ export const orderRoutes: FastifyPluginAsync = async (app) => {
     const parsed = enqueueOrderSchema.safeParse(req.body);
     if (!parsed.success) {
       return reply.code(400).send({ message: "Invalid request body", issues: parsed.error.flatten() });
+    }
+
+    // Verify Razorpay payment signature before doing any work
+    const { razorpayOrderId, razorpayPaymentId, razorpaySignature } = parsed.data;
+    if (!verifyRazorpaySignature(razorpayOrderId, razorpayPaymentId, razorpaySignature)) {
+      return reply.code(400).send({ message: "Invalid payment signature" });
     }
 
     // Verify all products exist before queuing

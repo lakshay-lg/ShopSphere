@@ -84,7 +84,20 @@ interface TrackedOrder {
 }
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
+const RAZORPAY_BUSINESS_NAME = import.meta.env.VITE_RAZORPAY_BUSINESS_NAME ?? "ShopSphere";
 const POLL_INTERVAL_MS = 2000;
+
+interface RazorpayPaymentResult {
+  razorpayOrderId: string;
+  razorpayPaymentId: string;
+  razorpaySignature: string;
+}
+
+declare global {
+  interface Window {
+    Razorpay: new (options: Record<string, unknown>) => { open(): void };
+  }
+}
 
 interface ShippingAddress {
   id: string;
@@ -260,6 +273,38 @@ const mapSnapshotToOrder = (
 
 const parseJSON = async <T,>(response: Response): Promise<T> => {
   return (await response.json()) as T;
+};
+
+const openRazorpayModal = (
+  keyId: string,
+  razorpayOrderId: string,
+  amountCents: number,
+  userEmail: string,
+  description: string,
+): Promise<RazorpayPaymentResult> => {
+  return new Promise((resolve, reject) => {
+    const options = {
+      key: keyId,
+      amount: amountCents,
+      currency: "INR",
+      name: RAZORPAY_BUSINESS_NAME,
+      description,
+      order_id: razorpayOrderId,
+      prefill: { email: userEmail },
+      theme: { color: "#6750A4" },
+      handler: (response: Record<string, string>) => {
+        resolve({
+          razorpayOrderId: response["razorpay_order_id"] ?? razorpayOrderId,
+          razorpayPaymentId: response["razorpay_payment_id"] ?? "",
+          razorpaySignature: response["razorpay_signature"] ?? "",
+        });
+      },
+      modal: {
+        ondismiss: () => reject(new Error("Payment cancelled")),
+      },
+    };
+    new window.Razorpay(options).open();
+  });
 };
 
 function MarketplacePage() {
@@ -468,6 +513,7 @@ function MarketplacePage() {
       items: CartItem[],
       normalizedUserId: string,
       idempotencyKey: string,
+      payment: RazorpayPaymentResult,
       shippingAddressId?: string,
     ): Promise<FlashSaleOrderResponse> => {
       const response = await fetch(`${API_BASE}/api/flash-sale/order`, {
@@ -479,6 +525,9 @@ function MarketplacePage() {
         body: JSON.stringify({
           userId: normalizedUserId,
           items,
+          razorpayOrderId: payment.razorpayOrderId,
+          razorpayPaymentId: payment.razorpayPaymentId,
+          razorpaySignature: payment.razorpaySignature,
           ...(shippingAddressId ? { shippingAddressId } : {}),
         }),
       });
@@ -569,6 +618,19 @@ function MarketplacePage() {
     [cart, quantityByProduct],
   );
 
+  const createRazorpayOrder = useCallback(
+    async (amountCents: number, receipt: string): Promise<{ orderId: string; amount: number; keyId: string }> => {
+      const response = await fetch(`${API_BASE}/api/payments/create-order`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amountCents, receipt }),
+      });
+      if (!response.ok) throw new Error("Could not create payment order");
+      return parseJSON<{ orderId: string; amount: number; keyId: string }>(response);
+    },
+    [],
+  );
+
   const quickQueueOrder = useCallback(
     async (product: Product) => {
       const normalizedUserId = userId.trim() || "shopper-001";
@@ -590,11 +652,22 @@ function MarketplacePage() {
       setPlacingProductId(product.id);
 
       try {
+        const amountCents = product.priceCents * quantity;
+        const rzpOrder = await createRazorpayOrder(amountCents, idempotencyKey.slice(0, 40));
+        const payment = await openRazorpayModal(
+          rzpOrder.keyId,
+          rzpOrder.orderId,
+          rzpOrder.amount,
+          user?.email ?? "",
+          `${product.name} x${quantity}`,
+        );
+
         const items: CartItem[] = [{ productId: product.id, quantity }];
         const payload = await enqueueOrder(
           items,
           normalizedUserId,
           idempotencyKey,
+          payment,
         );
 
         registerTrackedOrder(items, normalizedUserId, idempotencyKey, payload);
@@ -623,11 +696,13 @@ function MarketplacePage() {
       }
     },
     [
+      createRazorpayOrder,
       enqueueOrder,
       loadProducts,
       quantityByProduct,
       refreshTrackedOrders,
       registerTrackedOrder,
+      user,
       userId,
     ],
   );
@@ -821,11 +896,25 @@ function MarketplacePage() {
         quantity: item.quantity,
       }));
       const idempotencyKey = buildIdempotencyKey();
+      const amountCents = cartEntries.reduce(
+        (sum, { item, product }) => sum + (product?.priceCents ?? 0) * item.quantity,
+        0,
+      );
+
+      const rzpOrder = await createRazorpayOrder(amountCents, idempotencyKey.slice(0, 40));
+      const payment = await openRazorpayModal(
+        rzpOrder.keyId,
+        rzpOrder.orderId,
+        rzpOrder.amount,
+        user?.email ?? "",
+        `ShopSphere order — ${items.length} item(s)`,
+      );
 
       const payload = await enqueueOrder(
         items,
         normalizedUserId,
         idempotencyKey,
+        payment,
         selectedAddressId || undefined,
       );
       registerTrackedOrder(items, normalizedUserId, idempotencyKey, payload);
@@ -851,11 +940,13 @@ function MarketplacePage() {
     }
   }, [
     cartEntries,
+    createRazorpayOrder,
     enqueueOrder,
     loadProducts,
     refreshTrackedOrders,
     registerTrackedOrder,
     selectedAddressId,
+    user,
     userId,
   ]);
 

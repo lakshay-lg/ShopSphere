@@ -11,6 +11,9 @@ export const enqueueOrderSchema = z.object({
   userId: z.string().min(1),
   items: z.array(orderItemSchema).min(1).max(20),
   shippingAddressId: z.string().optional(),
+  razorpayOrderId: z.string().min(1),
+  razorpayPaymentId: z.string().min(1),
+  razorpaySignature: z.string().min(1),
 });
 
 export type OrderItemPayload = z.infer<typeof orderItemSchema>;

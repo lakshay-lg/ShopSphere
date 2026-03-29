@@ -20,6 +20,7 @@
     "fastify": "^5.0.0",
     "ioredis": "5.9.3",
     "jsonwebtoken": "^9.0.3",
+    "razorpay": "^2.9.6",
     "zod": "^3.23.8"
   },
   "devDependencies": {

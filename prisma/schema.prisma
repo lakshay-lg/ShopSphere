@@ -39,16 +39,18 @@ model ShippingAddress {
 }
 
 model Order {
-  id                String           @id @default(cuid())
-  queueJobId        String           @unique
-  userId            String
-  status            OrderStatus
-  failureReason     String?
-  shippingAddressId String?
-  shippingAddress   ShippingAddress? @relation(fields: [shippingAddressId], references: [id], onDelete: SetNull)
-  items             OrderItem[]
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
+  id                  String           @id @default(cuid())
+  queueJobId          String           @unique
+  userId              String
+  status              OrderStatus
+  failureReason       String?
+  shippingAddressId   String?
+  shippingAddress     ShippingAddress? @relation(fields: [shippingAddressId], references: [id], onDelete: SetNull)
+  razorpayOrderId     String?
+  razorpayPaymentId   String?
+  items               OrderItem[]
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
 
   @@index([userId, createdAt(sort: Desc)])
 }

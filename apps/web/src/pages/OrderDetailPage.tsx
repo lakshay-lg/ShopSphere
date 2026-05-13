@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.js";
+import Icon from "../components/Icon.js";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
 
@@ -74,13 +75,17 @@ export default function OrderDetailPage() {
 
   if (loading) {
     return (
-      <div className="page-container flex items-center justify-center min-h-[60vh]">
-        <div className="flex flex-col items-center gap-4 text-on-surface-variant">
-          <span className="material-symbols-outlined text-5xl animate-spin text-primary">
-            progress_activity
-          </span>
-          <p className="font-label text-sm uppercase tracking-widest">Loading order…</p>
+      <div className="page-container" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{
+            width: 48, height: 48, border: "3px solid var(--c-line)", borderTopColor: "var(--c-primary)",
+            borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 16px",
+          }}/>
+          <p style={{ fontFamily: "var(--font-display)", fontSize: 11, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--c-muted)" }}>
+            Loading order…
+          </p>
         </div>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
@@ -88,11 +93,16 @@ export default function OrderDetailPage() {
   if (error || !order) {
     return (
       <div className="page-container">
-        <div className="glass-card rounded-lg p-16 text-center">
-          <span className="material-symbols-outlined text-6xl text-error mb-4 block">error</span>
-          <p className="font-headline text-xl font-bold mb-2">{error || "Order not found"}</p>
-          <Link to="/orders" className="btn-secondary inline-block mt-4">
-            ← Back to Orders
+        <div className="ss-card" style={{ padding: 64, textAlign: "center" }}>
+          <div style={{ color: "var(--c-danger)", marginBottom: 16 }}>
+            <Icon name="x" size={48} stroke={1.5}/>
+          </div>
+          <p style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 700, marginBottom: 16 }}>
+            {error || "Order not found"}
+          </p>
+          <Link to="/orders" className="btn-secondary">
+            <Icon name="arrowL" size={14}/>
+            Back to Orders
           </Link>
         </div>
       </div>
@@ -104,71 +114,62 @@ export default function OrderDetailPage() {
   return (
     <div className="page-container">
       {/* Header */}
-      <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4">
+      <header style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 32 }}>
         <div>
-          <p className="eyebrow">Order Detail</p>
-          <h1 className="font-headline text-5xl font-bold tracking-tight text-on-surface">
+          <p className="eyebrow" style={{ marginBottom: 8 }}>Order Detail</p>
+          <h1 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(32px, 4vw, 48px)", fontWeight: 800, letterSpacing: "-0.04em", marginBottom: 4 }}>
             #{order.id.slice(-8).toUpperCase()}
           </h1>
-          <p className="text-on-surface-variant mt-2">
+          <p style={{ fontSize: 14, color: "var(--c-muted)" }}>
             Placed on{" "}
-            {new Date(order.createdAt).toLocaleString("en-IN", {
-              dateStyle: "long",
-              timeStyle: "short",
-            })}
+            {new Date(order.createdAt).toLocaleString("en-IN", { dateStyle: "long", timeStyle: "short" })}
           </p>
         </div>
-        <Link to="/orders" className="btn-secondary self-start md:self-auto">
-          ← Back to Orders
+        <Link to="/orders" className="btn-secondary" style={{ alignSelf: "flex-start" }}>
+          <Icon name="arrowL" size={14}/>
+          Back to Orders
         </Link>
       </header>
 
-      {/* Status / meta card */}
-      <div className="glass-card rounded-lg p-6 md:p-8 mb-6 border border-white/20 flex flex-wrap gap-8 items-center">
-        <div
-          className={`w-16 h-16 rounded-md flex items-center justify-center ${
-            isConfirmed ? "bg-primary/10 text-primary" : "bg-error/10 text-error"
-          }`}
-        >
-          <span className="material-symbols-outlined text-3xl">
-            {isConfirmed ? "package_2" : "error"}
-          </span>
+      {/* Status card */}
+      <div className="ss-card" style={{ padding: "24px 28px", marginBottom: 20, display: "flex", flexWrap: "wrap", gap: 24, alignItems: "center" }}>
+        <div style={{
+          width: 56, height: 56, borderRadius: 14,
+          background: isConfirmed ? "var(--c-primary-soft)" : "var(--c-danger-soft)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          color: isConfirmed ? "var(--c-primary)" : "var(--c-danger)",
+          flexShrink: 0,
+        }}>
+          <Icon name={isConfirmed ? "pkg" : "x"} size={24} stroke={1.8}/>
         </div>
 
         <div>
-          <p className="eyebrow">Status</p>
-          <span className={isConfirmed ? "status-badge-confirmed" : "status-badge-failed"}>
-            <span
-              className={`w-1.5 h-1.5 rounded-full ${
-                isConfirmed ? "bg-green-500" : "bg-red-500"
-              }`}
-            ></span>
+          <p className="eyebrow" style={{ marginBottom: 4 }}>Status</p>
+          <span className={isConfirmed ? "ss-pill ss-pill-success" : "ss-pill ss-pill-danger"}>
+            <span className="ss-dot" style={{ color: isConfirmed ? "var(--c-success)" : "var(--c-danger)" }}/>
             {order.status}
           </span>
           {order.failureReason && (
-            <p className="text-sm text-error mt-1">{order.failureReason}</p>
+            <p style={{ fontSize: 13, color: "var(--c-danger)", marginTop: 4 }}>{order.failureReason}</p>
           )}
         </div>
 
         <div>
-          <p className="eyebrow">Job ID</p>
-          <p className="font-mono text-sm text-on-surface-variant">{order.queueJobId}</p>
+          <p className="eyebrow" style={{ marginBottom: 4 }}>Job ID</p>
+          <p style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--c-muted)" }}>{order.queueJobId}</p>
         </div>
 
         <div>
-          <p className="eyebrow">Last Updated</p>
-          <p className="text-sm font-medium">
-            {new Date(order.updatedAt).toLocaleString("en-IN", {
-              dateStyle: "medium",
-              timeStyle: "short",
-            })}
+          <p className="eyebrow" style={{ marginBottom: 4 }}>Last Updated</p>
+          <p style={{ fontSize: 13, fontWeight: 600 }}>
+            {new Date(order.updatedAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
           </p>
         </div>
 
         {isConfirmed && (
-          <div className="ml-auto text-right">
-            <p className="eyebrow">Order Total</p>
-            <p className="font-headline text-3xl font-black text-primary">
+          <div style={{ marginLeft: "auto", textAlign: "right" }}>
+            <p className="eyebrow" style={{ marginBottom: 4 }}>Order Total</p>
+            <p style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: 32, color: "var(--c-primary)", letterSpacing: "-0.03em" }}>
               {toCurrency(orderTotal(order.items))}
             </p>
           </div>
@@ -177,13 +178,13 @@ export default function OrderDetailPage() {
 
       {/* Shipping address */}
       {order.shippingAddress && (
-        <div className="glass-card rounded-lg p-6 md:p-8 mb-6 border border-white/20">
-          <h2 className="font-headline text-xl font-bold mb-4 flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary">local_shipping</span>
+        <div className="ss-card" style={{ padding: "24px 28px", marginBottom: 20 }}>
+          <h2 style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: "var(--font-display)", fontSize: 16, fontWeight: 700, marginBottom: 16 }}>
+            <Icon name="truck" size={16} stroke={1.8}/>
             Shipping Address
           </h2>
-          <p className="font-semibold text-sm">{order.shippingAddress.fullName}</p>
-          <p className="text-sm text-on-surface-variant leading-relaxed mt-1">
+          <p style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>{order.shippingAddress.fullName}</p>
+          <p style={{ fontSize: 13, color: "var(--c-muted)", lineHeight: 1.7 }}>
             {order.shippingAddress.line1}
             {order.shippingAddress.line2 ? `, ${order.shippingAddress.line2}` : ""}<br />
             {order.shippingAddress.city}, {order.shippingAddress.state}{" "}
@@ -195,41 +196,40 @@ export default function OrderDetailPage() {
 
       {/* Items table */}
       {isConfirmed && order.items.length > 0 ? (
-        <div className="glass-card rounded-lg p-6 md:p-8 border border-white/20">
-          <h2 className="font-headline text-xl font-bold mb-6">Items</h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-separate border-spacing-y-3">
+        <div className="ss-card" style={{ padding: "24px 28px" }}>
+          <h2 style={{ fontFamily: "var(--font-display)", fontSize: 16, fontWeight: 700, marginBottom: 20 }}>Items</h2>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
-                <tr className="text-on-surface-variant font-label text-xs uppercase tracking-widest">
-                  <th className="pb-2 font-medium">Product</th>
-                  <th className="pb-2 font-medium">SKU</th>
-                  <th className="pb-2 font-medium text-center">Qty</th>
-                  <th className="pb-2 font-medium text-right">Unit Price</th>
-                  <th className="pb-2 font-medium text-right">Line Total</th>
+                <tr>
+                  {["Product", "SKU", "Qty", "Unit Price", "Line Total"].map((h, i) => (
+                    <th key={h} style={{
+                      padding: "0 12px 12px", fontFamily: "var(--font-display)", fontSize: 10,
+                      fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase",
+                      color: "var(--c-muted)", borderBottom: "1px solid var(--c-line)",
+                      textAlign: (i >= 2 ? (i === 2 ? "center" : "right") : "left") as "left" | "center" | "right",
+                    }}>{h}</th>
+                  ))}
                 </tr>
               </thead>
-              <tbody className="font-body text-sm">
+              <tbody>
                 {order.items.map((item) => (
-                  <tr key={item.id} className="bg-surface-container-lowest/50 rounded-lg">
-                    <td className="py-3 px-4 rounded-l-lg font-semibold">{item.product.name}</td>
-                    <td className="py-3 font-mono text-xs text-on-surface-variant">
-                      {item.product.sku}
-                    </td>
-                    <td className="py-3 text-center">{item.quantity}</td>
-                    <td className="py-3 text-right">{toCurrency(item.priceCents)}</td>
-                    <td className="py-3 px-4 text-right font-bold rounded-r-lg">
-                      {toCurrency(item.priceCents * item.quantity)}
-                    </td>
+                  <tr key={item.id}>
+                    <td style={{ padding: "12px 12px", fontWeight: 600 }}>{item.product.name}</td>
+                    <td style={{ padding: "12px 12px", fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--c-muted)" }}>{item.product.sku}</td>
+                    <td style={{ padding: "12px 12px", textAlign: "center" }}>{item.quantity}</td>
+                    <td style={{ padding: "12px 12px", textAlign: "right" }}>{toCurrency(item.priceCents)}</td>
+                    <td style={{ padding: "12px 12px", textAlign: "right", fontWeight: 700 }}>{toCurrency(item.priceCents * item.quantity)}</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan={3}></td>
-                  <td className="pt-6 text-right font-headline text-base font-bold">
+                  <td colSpan={3}/>
+                  <td style={{ padding: "20px 12px 0", textAlign: "right", fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 13 }}>
                     Order Total
                   </td>
-                  <td className="pt-6 text-right font-headline text-xl font-black text-primary px-4">
+                  <td style={{ padding: "20px 12px 0", textAlign: "right", fontFamily: "var(--font-display)", fontWeight: 800, fontSize: 22, color: "var(--c-primary)" }}>
                     {toCurrency(orderTotal(order.items))}
                   </td>
                 </tr>
@@ -237,13 +237,13 @@ export default function OrderDetailPage() {
             </table>
           </div>
         </div>
-      ) : (
-        isConfirmed && (
-          <div className="glass-card rounded-lg p-8 text-center text-on-surface-variant border border-white/20">
-            <p className="text-sm">No item details available for this order.</p>
-          </div>
-        )
-      )}
+      ) : isConfirmed ? (
+        <div className="ss-card" style={{ padding: 32, textAlign: "center" }}>
+          <p style={{ fontSize: 14, color: "var(--c-muted)" }}>No item details available for this order.</p>
+        </div>
+      ) : null}
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

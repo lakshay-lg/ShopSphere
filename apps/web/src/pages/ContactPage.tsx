@@ -1,4 +1,5 @@
 import { useState } from "react";
+import Icon from "../components/Icon.js";
 
 const API = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
 
@@ -35,105 +36,129 @@ function ContactPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center pt-8 pb-12 px-6 relative overflow-hidden">
-      {/* Background radial accents */}
-      <div className="absolute top-[-10%] right-[-10%] w-[600px] h-[600px] bg-primary-fixed/20 blur-[120px] rounded-full -z-10 pointer-events-none"></div>
-      <div className="absolute bottom-[-10%] left-[-10%] w-[400px] h-[400px] bg-secondary-container/30 blur-[100px] rounded-full -z-10 pointer-events-none"></div>
+    <div className="page-container">
+      {/* Page header */}
+      <header style={{ marginBottom: 48 }}>
+        <p className="eyebrow" style={{ marginBottom: 8 }}>Get in Touch</p>
+        <h1 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(40px, 5vw, 64px)", fontWeight: 800, letterSpacing: "-0.04em", lineHeight: 1, marginBottom: 16 }}>
+          Let's talk.
+        </h1>
+        <p style={{ fontSize: 16, color: "var(--c-muted)", maxWidth: 560, lineHeight: 1.6 }}>
+          Questions about a drop, a technical issue, or just want to say hello — we read every message.
+        </p>
+      </header>
 
-      <div className="w-full max-w-5xl grid lg:grid-cols-2 gap-12 items-center mt-16">
-        {/* Left: editorial content */}
-        <div className="space-y-8">
-          <div className="space-y-4">
-            <span className="inline-flex items-center px-4 py-1.5 rounded-full bg-secondary-container/50 text-on-secondary-container text-xs font-bold tracking-widest uppercase">
-              Get in Touch
-            </span>
-            <h1 className="font-headline text-5xl md:text-6xl font-bold text-on-surface tracking-tighter leading-[0.9]">
-              Elevate your <span className="text-primary italic">commerce</span> experience.
-            </h1>
-            <p className="text-lg text-on-surface-variant max-w-md leading-relaxed">
-              Our curation team is ready to assist you with bespoke solutions for your digital storefront.
-              Reach out for exclusive partnership opportunities.
-            </p>
-          </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1.2fr", gap: 24, alignItems: "start" }}>
+        {/* Left: contact info cards + FAQ */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {[
+            { icon: "heart", label: "Support", value: "concierge@shopsphere.io", detail: "For orders, returns, and anything shipping-related." },
+            { icon: "star", label: "Press & Partnerships", value: "press@shopsphere.io", detail: "Editorial requests, brand collabs, and APIs." },
+            { icon: "pin", label: "Based in", value: "Bengaluru, India", detail: "With distributed teams in Delhi and Pune." },
+            { icon: "clock", label: "Response time", value: "Within 24 hours", detail: "Monday–Friday. Slower on drop weekends." },
+          ].map((item) => (
+            <div key={item.label} className="ss-card" style={{ padding: "20px 24px", display: "flex", gap: 16, alignItems: "flex-start" }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: 10, background: "var(--c-surface-2)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: "var(--c-primary)", flexShrink: 0,
+              }}>
+                <Icon name={item.icon} size={18} stroke={1.8}/>
+              </div>
+              <div>
+                <p className="eyebrow" style={{ marginBottom: 3 }}>{item.label}</p>
+                <p style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 14, marginBottom: 3 }}>{item.value}</p>
+                <p style={{ fontSize: 12, color: "var(--c-muted)", lineHeight: 1.5 }}>{item.detail}</p>
+              </div>
+            </div>
+          ))}
 
-          <div className="grid grid-cols-1 gap-5">
+          {/* FAQ strip */}
+          <div className="ss-card" style={{ padding: "24px", background: "var(--c-ink)", color: "var(--c-surface)" }}>
+            <p className="eyebrow" style={{ color: "rgba(244,246,248,0.5)", marginBottom: 12 }}>Quick FAQ</p>
             {[
-              { icon: "mail", label: "Direct Inquiry", value: "concierge@shopsphere.io" },
-              { icon: "location_on", label: "Focus Areas", value: "Distributed systems, backend reliability, and production AI tooling." },
-              { icon: "schedule", label: "Response Window", value: "Usually within 24 hours on weekdays." },
-            ].map((item) => (
-              <div key={item.label} className="flex items-center gap-4 group">
-                <div className="w-12 h-12 rounded-full bg-surface-container-low flex items-center justify-center border border-outline-variant/20 group-hover:bg-primary transition-colors duration-300">
-                  <span className="material-symbols-outlined text-primary group-hover:text-white">{item.icon}</span>
-                </div>
-                <div>
-                  <p className="font-headline font-bold text-sm">{item.label}</p>
-                  <p className="text-on-surface-variant text-sm">{item.value}</p>
-                </div>
+              { q: "Can I change my order after queuing?", a: "No. Queue jobs are immutable once dispatched." },
+              { q: "How do refunds work?", a: "Failed orders are never charged. Confirmed refunds within 7 days." },
+            ].map((faq) => (
+              <div key={faq.q} style={{ marginBottom: 16 }}>
+                <p style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 13, color: "#fff", marginBottom: 4 }}>{faq.q}</p>
+                <p style={{ fontSize: 12, color: "rgba(244,246,248,0.6)", lineHeight: 1.5 }}>{faq.a}</p>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Right: contact form */}
-        <div className="glass-card p-10 md:p-12 rounded-xl shadow-glass">
-          <form className="space-y-7" onSubmit={handleSubmit}>
-            <div className="space-y-5">
-              {[
-                { label: "Full Name", type: "text", value: name, onChange: setName, placeholder: "Your name" },
-                { label: "Email Address", type: "email", value: email, onChange: setEmail, placeholder: "your@email.com" },
-              ].map((field) => (
-                <div key={field.label} className="relative">
-                  <label className="absolute -top-2.5 left-4 px-2 bg-white/90 text-primary text-[10px] font-bold uppercase tracking-widest z-10 rounded">
-                    {field.label}
-                  </label>
-                  <input
-                    type={field.type}
-                    className="input-field"
-                    placeholder={field.placeholder}
-                    value={field.value}
-                    onChange={(e) => field.onChange(e.target.value)}
-                    required
-                  />
-                </div>
-              ))}
-              <div className="relative">
-                <label className="absolute -top-2.5 left-4 px-2 bg-white/90 text-primary text-[10px] font-bold uppercase tracking-widest z-10 rounded">
-                  Your Message
-                </label>
-                <textarea
-                  className="input-field resize-none"
-                  placeholder="Tell us what you are building..."
-                  rows={5}
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  minLength={10}
-                  required
-                />
-              </div>
+        {/* Right: form */}
+        <div className="ss-card" style={{ padding: "36px 40px" }}>
+          <h2 style={{ fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em", marginBottom: 28 }}>
+            Send a message
+          </h2>
+
+          <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+            <div>
+              <label style={{ display: "block", fontFamily: "var(--font-display)", fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "var(--c-muted)", marginBottom: 6 }}>
+                Full Name
+              </label>
+              <input
+                type="text"
+                className="input-field"
+                placeholder="Your name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+              />
+            </div>
+            <div>
+              <label style={{ display: "block", fontFamily: "var(--font-display)", fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "var(--c-muted)", marginBottom: 6 }}>
+                Email Address
+              </label>
+              <input
+                type="email"
+                className="input-field"
+                placeholder="your@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+            <div>
+              <label style={{ display: "block", fontFamily: "var(--font-display)", fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "var(--c-muted)", marginBottom: 6 }}>
+                Message
+              </label>
+              <textarea
+                className="input-field"
+                placeholder="Tell us what's on your mind…"
+                rows={5}
+                style={{ resize: "none" }}
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                minLength={10}
+                required
+              />
             </div>
 
             {error && (
-              <p className="text-sm text-error font-medium bg-error/5 rounded-lg px-4 py-3">{error}</p>
+              <div style={{ background: "var(--c-danger-soft)", border: "1px solid var(--c-danger)", borderRadius: 10, padding: "10px 14px" }}>
+                <p style={{ fontSize: 13, color: "var(--c-danger)", fontWeight: 600 }}>{error}</p>
+              </div>
             )}
             {status && (
-              <p className="text-sm text-green-700 font-medium bg-green-50 rounded-lg px-4 py-3">{status}</p>
+              <div style={{ background: "var(--c-success-soft)", border: "1px solid var(--c-success)", borderRadius: 10, padding: "10px 14px" }}>
+                <p style={{ fontSize: 13, color: "var(--c-success)", fontWeight: 600 }}>{status}</p>
+              </div>
             )}
 
             <button
               type="submit"
               disabled={isSubmitting}
-              className="btn-primary w-full py-4 flex items-center justify-center gap-3 group disabled:opacity-60"
+              className="btn-primary"
+              style={{ width: "100%", padding: "14px 0", opacity: isSubmitting ? 0.6 : 1 }}
             >
               {isSubmitting ? "Sending…" : "Send Message"}
-              {!isSubmitting && (
-                <span className="material-symbols-outlined text-sm group-hover:translate-x-1 transition-transform">
-                  arrow_forward
-                </span>
-              )}
+              {!isSubmitting && <Icon name="arrow" size={15}/>}
             </button>
-            <p className="text-center text-[10px] text-on-surface-variant/60 font-medium uppercase tracking-tight">
-              Estimated response time: 2–4 Business Hours
+            <p style={{ fontSize: 11, color: "var(--c-muted)", textAlign: "center" as const }}>
+              Estimated response: 2–4 business hours
             </p>
           </form>
         </div>

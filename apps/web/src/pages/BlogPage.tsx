@@ -1,8 +1,32 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { blogPosts } from "../data/blogPosts.js";
+import Icon from "../components/Icon.js";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
+
+const SWATCH_COLORS = [
+  ["#0b3fad", "#1855e0", "#c9d8ff"],
+  ["#f06a2c", "#e04010", "#ffe8da"],
+  ["#168a4a", "#1ab35e", "#d8f0e2"],
+  ["#b87100", "#e09200", "#fcecca"],
+];
+
+function PostSwatch({ index, aspect = "16/9" }: { index: number; aspect?: string }) {
+  const [a, b] = SWATCH_COLORS[index % SWATCH_COLORS.length] ?? ["#0b3fad", "#1855e0"];
+  return (
+    <div style={{ aspectRatio: aspect, background: `linear-gradient(135deg, ${a}, ${b})`, position: "relative", overflow: "hidden" }}>
+      <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0.15 }} preserveAspectRatio="xMidYMid slice">
+        <defs>
+          <pattern id={`bp-${index}`} width="24" height="24" patternUnits="userSpaceOnUse">
+            <circle cx="12" cy="12" r="1.5" fill="#fff"/>
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill={`url(#bp-${index})`}/>
+      </svg>
+    </div>
+  );
+}
 
 function BlogPage() {
   const [featured, ...rest] = blogPosts;
@@ -33,148 +57,160 @@ function BlogPage() {
   return (
     <div className="page-container">
       {/* Header */}
-      <header className="mb-14 text-center md:text-left">
-        <div className="inline-block px-4 py-1.5 rounded-full bg-tertiary-fixed/30 text-tertiary text-xs font-bold font-headline uppercase tracking-widest mb-4">
-          Flash Insights
-        </div>
-        <h1 className="font-headline text-5xl md:text-6xl font-bold tracking-tight text-on-surface leading-tight mb-4">
-          The Curated <br />
-          <span className="text-primary">Chronicle.</span>
+      <header style={{ marginBottom: 48 }}>
+        <p className="eyebrow" style={{ marginBottom: 10 }}>From the journal</p>
+        <h1 style={{
+          fontFamily: "var(--font-display)", fontSize: "clamp(48px, 6vw, 80px)",
+          fontWeight: 800, letterSpacing: "-0.05em", lineHeight: 0.95, marginBottom: 20,
+        }}>
+          Engineering,<br />
+          <span style={{ color: "var(--c-accent)" }}>design</span>, and the<br />
+          warehouse floor.
         </h1>
-        <p className="max-w-2xl text-on-surface-variant text-lg leading-relaxed font-body">
+        <p style={{ fontSize: 16, color: "var(--c-muted)", maxWidth: 560, lineHeight: 1.6 }}>
           Architecture decisions, scaling lessons, and implementation tradeoffs from the ShopSphere build.
         </p>
       </header>
 
-      {/* Bento grid */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+      {/* Featured + side cards */}
+      <div style={{ display: "grid", gridTemplateColumns: "8fr 4fr", gap: 16, marginBottom: 16 }}>
         {/* Featured post */}
         {featured && (
-          <article className="md:col-span-8 group cursor-pointer">
-            <Link to={`/blog/${featured.slug}`} className="block h-full">
-              <div className="glass-card rounded-lg overflow-hidden h-full flex flex-col hover:shadow-glass-hover transition-all duration-500">
-                <div className="p-8 md:p-10 flex-grow flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center gap-3 mb-4 text-xs font-medium font-headline text-on-surface-variant tracking-wider uppercase">
-                      <span className="bg-white/90 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold text-primary shadow-sm border border-outline-variant/20">
-                        FEATURED
-                      </span>
-                      <span>{featured.date}</span>
-                      <span className="w-1 h-1 rounded-full bg-outline-variant"></span>
-                      <span>{featured.tag}</span>
-                    </div>
-                    <h2 className="font-headline text-3xl font-bold mb-4 group-hover:text-primary transition-colors leading-tight">
-                      {featured.title}
-                    </h2>
-                    <p className="text-on-surface-variant text-base leading-relaxed mb-6 line-clamp-3">
-                      {featured.excerpt}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 text-primary font-bold text-sm uppercase tracking-widest">
-                    Read Full Post
-                    <span className="material-symbols-outlined text-base">arrow_forward</span>
-                  </div>
+          <Link to={`/blog/${featured.slug}`} style={{ textDecoration: "none" }}>
+            <article className="ss-card" style={{ padding: 0, overflow: "hidden", height: "100%", cursor: "pointer", transition: "box-shadow 0.2s" }}>
+              <PostSwatch index={0} aspect="16/7"/>
+              <div style={{ padding: "28px 32px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                  <span className="ss-pill ss-pill-strong" style={{ fontSize: 10, letterSpacing: "0.1em" }}>Featured</span>
+                  <span style={{ fontSize: 11, color: "var(--c-muted)" }}>{featured.date}</span>
+                  <span style={{ fontSize: 11, color: "var(--c-muted)" }}>·</span>
+                  <span style={{ fontSize: 11, color: "var(--c-muted)" }}>{featured.tag}</span>
                 </div>
+                <h2 style={{ fontFamily: "var(--font-display)", fontSize: 26, fontWeight: 700, letterSpacing: "-0.02em", lineHeight: 1.2, marginBottom: 10 }}>
+                  {featured.title}
+                </h2>
+                <p style={{ fontSize: 14, color: "var(--c-muted)", lineHeight: 1.6, marginBottom: 16 }}>
+                  {featured.excerpt}
+                </p>
+                <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, fontFamily: "var(--font-display)", color: "var(--c-primary)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                  Read Full Post <Icon name="arrow" size={13}/>
+                </span>
               </div>
-            </Link>
-          </article>
+            </article>
+          </Link>
         )}
 
-        {/* Side cards */}
-        <div className="md:col-span-4 flex flex-col gap-6">
-          {rest.slice(0, 2).map((post) => (
-            <article key={post.slug} className="group cursor-pointer flex-1">
-              <Link to={`/blog/${post.slug}`} className="block h-full">
-                <div className="glass-card rounded-lg overflow-hidden h-full hover:shadow-glass-hover transition-all duration-500 p-7 flex flex-col justify-between">
-                  <div>
-                    <div className="text-xs font-medium font-headline text-on-surface-variant tracking-wider uppercase mb-2">
-                      {post.date} · {post.tag}
-                    </div>
-                    <h3 className="font-headline text-lg font-bold mb-3 group-hover:text-primary transition-colors leading-snug">
-                      {post.title}
-                    </h3>
-                    <p className="text-on-surface-variant text-sm leading-relaxed line-clamp-2">{post.excerpt}</p>
-                  </div>
-                  <div className="flex items-center gap-1 text-primary font-bold text-xs uppercase tracking-widest mt-5">
-                    Read
-                    <span className="material-symbols-outlined text-sm">arrow_outward</span>
-                  </div>
+        {/* Side posts */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {rest.slice(0, 2).map((post, i) => (
+            <Link key={post.slug} to={`/blog/${post.slug}`} style={{ textDecoration: "none", flex: 1 }}>
+              <article className="ss-card" style={{ padding: 0, overflow: "hidden", height: "100%", cursor: "pointer" }}>
+                <PostSwatch index={i + 1} aspect="16/6"/>
+                <div style={{ padding: "18px 20px" }}>
+                  <p style={{ fontSize: 11, color: "var(--c-muted)", marginBottom: 6 }}>{post.date} · {post.tag}</p>
+                  <h3 style={{ fontFamily: "var(--font-display)", fontSize: 16, fontWeight: 700, letterSpacing: "-0.01em", lineHeight: 1.25, marginBottom: 8 }}>
+                    {post.title}
+                  </h3>
+                  <p style={{ fontSize: 12, color: "var(--c-muted)", lineHeight: 1.5 }}>
+                    {post.excerpt.slice(0, 100)}…
+                  </p>
                 </div>
-              </Link>
-            </article>
-          ))}
-        </div>
-
-        {/* Bottom grid */}
-        {rest.slice(2).map((post) => (
-          <article key={post.slug} className="md:col-span-4 group cursor-pointer">
-            <Link to={`/blog/${post.slug}`} className="block h-full">
-              <div className="glass-card rounded-lg overflow-hidden h-full hover:shadow-glass-hover transition-all duration-500 p-7">
-                <div className="text-xs font-medium font-headline text-on-surface-variant tracking-wider uppercase mb-2">
-                  {post.date} · {post.readTime}
-                </div>
-                <h3 className="font-headline text-lg font-bold mb-3 group-hover:text-primary transition-colors leading-snug">
-                  {post.title}
-                </h3>
-                <p className="text-on-surface-variant text-sm leading-relaxed line-clamp-3">{post.excerpt}</p>
-              </div>
+              </article>
             </Link>
-          </article>
-        ))}
-
-        {/* Quote card */}
-        <div className="md:col-span-4 glass-card rounded-lg overflow-hidden bg-primary-container text-white p-8 flex flex-col justify-between">
-          <span className="material-symbols-outlined text-4xl mb-4 opacity-60">format_quote</span>
-          <h3 className="font-headline text-2xl font-bold leading-tight">
-            "Speed is the bridge between desire and ownership."
-          </h3>
-          <div className="text-sm font-headline tracking-widest opacity-80 mt-6">
-            — SHOPSPHERE EDITORIAL
-          </div>
+          ))}
         </div>
       </div>
 
-      {/* Newsletter section */}
-      <section className="mt-24 rounded-lg bg-surface-container-low p-12 md:p-16 text-center relative overflow-hidden">
-        <h2 className="font-headline text-3xl md:text-4xl font-bold tracking-tight mb-4">
-          Stay within the <span className="text-primary">Sphere.</span>
+      {/* Bottom grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 64 }}>
+        {rest.slice(2).map((post, i) => (
+          <Link key={post.slug} to={`/blog/${post.slug}`} style={{ textDecoration: "none" }}>
+            <article className="ss-card" style={{ padding: 0, overflow: "hidden", height: "100%", cursor: "pointer" }}>
+              <PostSwatch index={i + 3} aspect="16/8"/>
+              <div style={{ padding: "20px 22px" }}>
+                <p style={{ fontSize: 11, color: "var(--c-muted)", marginBottom: 6 }}>{post.date} · {post.readTime}</p>
+                <h3 style={{ fontFamily: "var(--font-display)", fontSize: 16, fontWeight: 700, letterSpacing: "-0.01em", lineHeight: 1.25, marginBottom: 8 }}>
+                  {post.title}
+                </h3>
+                <p style={{ fontSize: 12, color: "var(--c-muted)", lineHeight: 1.5 }}>
+                  {post.excerpt.slice(0, 120)}…
+                </p>
+              </div>
+            </article>
+          </Link>
+        ))}
+
+        {/* Quote card */}
+        <div style={{
+          background: "var(--c-ink)", borderRadius: "var(--d-radius)", padding: "24px 28px",
+          display: "flex", flexDirection: "column", justifyContent: "space-between",
+        }}>
+          <span style={{ fontSize: 48, lineHeight: 1, color: "var(--c-accent)", fontFamily: "serif", marginBottom: 12 }}>"</span>
+          <h3 style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 700, color: "#fff", lineHeight: 1.3, letterSpacing: "-0.02em" }}>
+            Speed is the bridge between desire and ownership.
+          </h3>
+          <p style={{ fontSize: 11, color: "rgba(244,246,248,0.45)", letterSpacing: "0.12em", textTransform: "uppercase", marginTop: 20 }}>
+            — ShopSphere Editorial
+          </p>
+        </div>
+      </div>
+
+      {/* Newsletter */}
+      <section style={{
+        background: "var(--c-ink)", borderRadius: "var(--d-radius-lg)",
+        padding: "56px 64px", textAlign: "center",
+        position: "relative", overflow: "hidden",
+      }}>
+        <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0.05, pointerEvents: "none" }} preserveAspectRatio="xMidYMid slice">
+          <defs>
+            <pattern id="nl-grid" width="40" height="40" patternUnits="userSpaceOnUse">
+              <path d="M 40 0 L 0 0 0 40" fill="none" stroke="white" strokeWidth="0.5"/>
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#nl-grid)"/>
+        </svg>
+        <p className="eyebrow" style={{ color: "rgba(244,246,248,0.5)", marginBottom: 12 }}>Stay informed</p>
+        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(28px, 4vw, 48px)", fontWeight: 800, color: "#fff", letterSpacing: "-0.03em", marginBottom: 12 }}>
+          Stay within the <span style={{ color: "var(--c-accent)" }}>Sphere.</span>
         </h2>
-        <p className="max-w-lg mx-auto text-on-surface-variant mb-8 font-body">
-          Get exclusive early access to flash collections and engineering insights directly in your inbox.
+        <p style={{ fontSize: 15, color: "rgba(244,246,248,0.6)", maxWidth: 480, margin: "0 auto 32px", lineHeight: 1.6 }}>
+          Drop alerts, restocks, and the occasional long-read. No marketing slop.
         </p>
+
         {newsletterState === "success" ? (
-          <p className="max-w-md mx-auto text-primary font-bold font-headline text-lg">
+          <p style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 18, color: "var(--c-accent)" }}>
             {newsletterMessage}
           </p>
         ) : (
           <>
             <form
-              className="max-w-md mx-auto flex flex-col md:flex-row gap-3"
               onSubmit={handleNewsletter}
+              style={{ display: "flex", gap: 10, maxWidth: 440, margin: "0 auto", position: "relative", zIndex: 1 }}
             >
               <input
-                className="input-field flex-grow"
-                placeholder="curator@example.com"
                 type="email"
+                className="input-field"
+                placeholder="you@example.com"
                 value={newsletterEmail}
                 onChange={(e) => setNewsletterEmail(e.target.value)}
                 required
                 disabled={newsletterState === "loading"}
+                style={{ background: "rgba(255,255,255,0.08)", borderColor: "rgba(255,255,255,0.12)", color: "#fff" }}
               />
               <button
                 type="submit"
-                className="btn-primary whitespace-nowrap"
+                className="btn-primary"
                 disabled={newsletterState === "loading"}
+                style={{ whiteSpace: "nowrap", background: "var(--c-accent)", flexShrink: 0 }}
               >
-                {newsletterState === "loading" ? "Subscribing…" : "Subscribe"}
+                {newsletterState === "loading" ? "…" : "Subscribe"}
               </button>
             </form>
             {newsletterState === "error" && (
-              <p className="text-error text-sm mt-3">{newsletterMessage}</p>
+              <p style={{ color: "var(--c-danger)", fontSize: 13, marginTop: 10 }}>{newsletterMessage}</p>
             )}
           </>
         )}
-        <div className="absolute bottom-0 right-0 w-72 h-72 bg-primary/5 rounded-full blur-3xl pointer-events-none"></div>
       </section>
     </div>
   );

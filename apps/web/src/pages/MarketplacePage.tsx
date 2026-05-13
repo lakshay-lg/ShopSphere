@@ -9,6 +9,8 @@ import {
 import { Link } from "react-router-dom";
 import "../styles.css";
 import { useAuth } from "../context/AuthContext.js";
+import Icon from "../components/Icon.js";
+import Swatch, { getProductSwatch } from "../components/Swatch.js";
 
 type HealthState = "checking" | "ok" | "down";
 type QueueState = string;
@@ -950,271 +952,228 @@ function MarketplacePage() {
     userId,
   ]);
 
-  const urgencyClasses: Record<string, string> = {
-    danger: "bg-red-100 text-red-700",
-    warn: "bg-tertiary-fixed/40 text-tertiary",
-    info: "bg-secondary-container/50 text-on-secondary-container",
-    good: "bg-green-100 text-green-700",
+  const urgencyPillClass: Record<string, string> = {
+    danger: "ss-pill ss-pill-danger",
+    warn: "ss-pill ss-pill-warn",
+    info: "ss-pill ss-pill-info",
+    good: "ss-pill ss-pill-success",
   };
 
-  const orderToneClasses: Record<string, string> = {
-    good: "border-l-green-500 bg-green-50/50",
-    warn: "border-l-tertiary-fixed-dim bg-tertiary-fixed/10",
-    danger: "border-l-error bg-error-container/20",
-    info: "border-l-primary-fixed-dim bg-primary-fixed/10",
+  const orderToneBorder: Record<string, string> = {
+    good: "var(--c-success)",
+    warn: "var(--c-warn)",
+    danger: "var(--c-danger)",
+    info: "var(--c-primary)",
+  };
+
+  const orderToneBg: Record<string, string> = {
+    good: "var(--c-success-soft)",
+    warn: "var(--c-warn-soft)",
+    danger: "var(--c-danger-soft)",
+    info: "var(--c-info-soft)",
   };
 
   return (
     <div className="page-container">
       {/* Page header */}
-      <header className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
+      <header style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 24 }}>
         <div>
-          <p className="eyebrow">ShopSphere Frontline</p>
-          <h1 className="font-headline text-5xl font-bold tracking-tight text-on-surface">
+          <p className="eyebrow" style={{ marginBottom: 8 }}>Catalogue · Drop 14</p>
+          <h1 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(40px, 5vw, 64px)", fontWeight: 800, letterSpacing: "-0.04em", lineHeight: 1, marginBottom: 0 }}>
             Marketplace
           </h1>
-          <p className="text-on-surface-variant mt-1">
-            Curated collections for the modern digital merchant.
-          </p>
         </div>
-        <div
-          className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider self-start md:self-auto
-          ${health === "ok" ? "bg-green-100 text-green-700" : health === "down" ? "bg-red-100 text-red-700" : "bg-surface-container text-on-surface-variant"}`}
-        >
+        <div style={{ display: "flex", gap: 8, alignSelf: "flex-start" }}>
           <span
-            className={`w-2 h-2 rounded-full ${health === "ok" ? "bg-green-500 animate-pulse" : health === "down" ? "bg-red-500" : "bg-outline animate-pulse"}`}
-          ></span>
-          API {health.toUpperCase()}
+            className={health === "ok" ? "ss-pill ss-pill-success" : health === "down" ? "ss-pill ss-pill-danger" : "ss-pill"}
+          >
+            <span className={`ss-dot${health === "ok" ? " ss-dot-pulse" : ""}`} style={{ color: health === "ok" ? "var(--c-success)" : health === "down" ? "var(--c-danger)" : "var(--c-muted)" }}/>
+            API · {health.toUpperCase()}
+          </span>
+          <span className="ss-pill">Queue · {pendingCount} active</span>
         </div>
       </header>
 
       {/* Metric strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 mb-8">
+      <div className="ss-card" style={{ padding: 0, overflow: "hidden", display: "grid", gridTemplateColumns: "repeat(7, 1fr)", marginBottom: 24 }}>
         {[
-          { label: "Products Live", value: products.length },
-          { label: "Results", value: filteredProducts.length },
-          { label: "Total Units", value: totalStock.toLocaleString() },
+          { label: "Live SKUs", value: products.length },
+          { label: "Showing", value: filteredProducts.length },
+          { label: "Total Units", value: totalStock.toLocaleString("en-IN") },
           { label: "Low Stock", value: lowStockCount },
           { label: "Cart Units", value: cartUnits },
           { label: "Pending Jobs", value: pendingCount },
           { label: "Confirmed", value: confirmedCount },
-        ].map((m) => (
-          <div key={m.label} className="glass-card rounded-lg p-4 text-center">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-1">
-              {m.label}
-            </p>
-            <p className="font-headline text-2xl font-bold text-primary">
+        ].map((m, i) => (
+          <div key={m.label} style={{ padding: "16px 18px", borderRight: i < 6 ? "1px solid var(--c-line)" : "none" }}>
+            <p className="eyebrow" style={{ fontSize: 9, marginBottom: 4 }}>{m.label}</p>
+            <p style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: 24, letterSpacing: "-0.03em" }}>
               {m.value}
             </p>
           </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <div style={{ display: "grid", gridTemplateColumns: "8fr 4fr", gap: 24 }}>
         {/* Product grid */}
-        <section className="lg:col-span-8">
+        <section>
           {/* Search + sort toolbar */}
-          <div className="glass-card rounded-xl p-4 flex flex-col md:flex-row gap-3 mb-6">
-            <div className="relative flex-grow">
-              <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant text-xl">
-                search
+          <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" as const }}>
+            <div style={{ position: "relative", flex: "1 1 280px" }}>
+              <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "var(--c-muted)", pointerEvents: "none" }}>
+                <Icon name="search" size={15}/>
               </span>
               <input
                 id="catalog-search"
-                className="input-field pl-12"
+                className="input-field"
+                style={{ paddingLeft: 40 }}
                 value={searchQuery}
                 placeholder="Search by name or SKU…"
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <div className="relative w-full md:w-48">
-              <select
-                id="catalog-sort"
-                className="input-field appearance-none pr-10"
-                value={sortOption}
-                onChange={(e) => setSortOption(e.target.value as SortOption)}
-              >
-                {sortOptions.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-              <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant">
-                expand_more
-              </span>
-            </div>
+            <select
+              id="catalog-sort"
+              className="input-field"
+              style={{ width: 180 }}
+              value={sortOption}
+              onChange={(e) => setSortOption(e.target.value as SortOption)}
+            >
+              {sortOptions.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
           </div>
 
-          <p className="text-xs text-on-surface-variant mb-4">
-            {filteredProducts.length} product(s) · {lowStockCount} SKU(s) in
-            critical range
+          <p style={{ fontSize: 12, color: "var(--c-muted)", marginBottom: 16 }}>
+            {filteredProducts.length} product{filteredProducts.length !== 1 ? "s" : ""} · {lowStockCount} SKU{lowStockCount !== 1 ? "s" : ""} critical
           </p>
 
           {productsLoading && (
-            <div className="flex items-center justify-center py-16 text-on-surface-variant gap-3">
-              <span className="material-symbols-outlined animate-spin text-primary">
-                progress_activity
-              </span>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "48px 0", gap: 12, color: "var(--c-muted)" }}>
+              <div style={{ width: 20, height: 20, border: "2px solid var(--c-line)", borderTopColor: "var(--c-primary)", borderRadius: "50%", animation: "spin 0.8s linear infinite" }}/>
               Loading products…
             </div>
           )}
           {productsError && (
-            <p className="text-sm text-error font-medium bg-error/5 rounded-lg px-4 py-3 mb-4">
-              {productsError}
+            <div style={{ background: "var(--c-danger-soft)", border: "1px solid var(--c-danger)", borderRadius: 10, padding: "10px 14px", marginBottom: 16 }}>
+              <p style={{ fontSize: 13, color: "var(--c-danger)", fontWeight: 600 }}>{productsError}</p>
+            </div>
+          )}
+          {!productsLoading && !productsError && filteredProducts.length === 0 && (
+            <p style={{ color: "var(--c-muted)", textAlign: "center", padding: "48px 0" }}>
+              No products match the current search.
             </p>
           )}
-          {!productsLoading &&
-            !productsError &&
-            filteredProducts.length === 0 && (
-              <p className="text-on-surface-variant text-center py-12">
-                No products match the current search.
-              </p>
-            )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {filteredProducts.map((product) => {
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+            {filteredProducts.map((product, productIdx) => {
               const isSoldOut = product.stock <= 0;
-              const selectedQuantity = clampQuantity(
-                quantityByProduct[product.id] ?? 1,
-              );
+              const selectedQuantity = clampQuantity(quantityByProduct[product.id] ?? 1);
               const quantityExceedsStock = selectedQuantity > product.stock;
               const cartQuantity = cartQuantityMap.get(product.id) ?? 0;
               const urgency = getUrgencyMeta(product.stock);
+              const swatch = getProductSwatch(product.id, productIdx);
 
               return (
                 <article
                   key={product.id}
-                  className={`glass-card rounded-[24px] overflow-hidden hover:scale-[1.02] transition-all duration-500 ${isSoldOut ? "opacity-60" : ""}`}
+                  className="ss-card"
+                  style={{ padding: 0, overflow: "hidden", opacity: isSoldOut ? 0.65 : 1, transition: "box-shadow 0.2s" }}
                 >
-                  {/* Product colour band */}
-                  <div className="h-32 bg-gradient-to-br from-primary-fixed to-secondary-container flex items-center justify-center relative">
-                    <span className="font-headline text-5xl font-bold text-primary/20 select-none">
-                      {product.name.charAt(0)}
-                    </span>
-                    {/* Stock badge */}
-                    <div
-                      className={`absolute top-3 right-3 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${urgencyClasses[urgency.tone] ?? ""}`}
+                  {/* Product swatch */}
+                  <div style={{ position: "relative", height: 140 }}>
+                    <Swatch
+                      kind={swatch.kind}
+                      a={swatch.a}
+                      b={swatch.b}
+                      c={swatch.c}
+                      style={{ width: "100%", height: "100%" }}
+                    />
+                    <span
+                      className={urgencyPillClass[urgency.tone] ?? "ss-pill"}
+                      style={{ position: "absolute", top: 10, right: 10, fontSize: 10 }}
                     >
                       {urgency.label}
-                    </div>
+                    </span>
                     {cartQuantity > 0 && (
-                      <div className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-primary text-white text-[10px] font-bold">
-                        In Cart: {cartQuantity}
-                      </div>
+                      <span className="ss-pill ss-pill-strong" style={{ position: "absolute", top: 10, left: 10, fontSize: 10 }}>
+                        Cart: {cartQuantity}
+                      </span>
                     )}
                   </div>
 
-                  <div className="p-5 space-y-3">
-                    <div className="flex justify-between items-start gap-2">
-                      <div>
+                  <div style={{ padding: "16px 18px", display: "flex", flexDirection: "column", gap: 10 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                      <div style={{ minWidth: 0 }}>
                         <Link
                           to={`/products/${product.id}`}
-                          className="font-headline text-base font-bold text-on-surface leading-snug hover:text-primary transition-colors"
+                          style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 14, lineHeight: 1.25, display: "block" }}
                         >
                           {product.name}
                         </Link>
-                        <p className="text-[10px] text-outline font-medium tracking-tighter mt-0.5">
-                          SKU: {product.sku}
+                        <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--c-muted)", marginTop: 2 }}>
+                          {product.sku}
                         </p>
                       </div>
-                      <p className="font-headline text-lg font-bold text-primary whitespace-nowrap">
+                      <p style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: 16, color: "var(--c-primary)", whiteSpace: "nowrap", flexShrink: 0 }}>
                         {toCurrency(product.priceCents)}
                       </p>
                     </div>
 
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-on-surface-variant">
-                        Stock:{" "}
-                        <span className="font-bold text-on-surface">
-                          {isSoldOut
-                            ? "Sold Out"
-                            : product.stock.toLocaleString()}
-                        </span>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <span style={{ fontSize: 12, color: "var(--c-muted)" }}>
+                        Stock: <strong style={{ color: "var(--c-ink)" }}>{isSoldOut ? "Sold Out" : product.stock.toLocaleString("en-IN")}</strong>
                       </span>
-                      <div className="flex items-center bg-surface-container-low rounded-lg p-1 gap-1">
+                      <div style={{ display: "flex", alignItems: "center", background: "var(--c-surface-2)", borderRadius: 8, padding: "2px 4px", gap: 2 }}>
                         <button
-                          className="w-7 h-7 flex items-center justify-center hover:bg-white rounded transition-colors text-lg font-bold"
-                          onClick={() =>
-                            setQuantityByProduct((p) => ({
-                              ...p,
-                              [product.id]: clampQuantity(
-                                (p[product.id] ?? 1) - 1,
-                              ),
-                            }))
-                          }
+                          style={{ width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", fontWeight: 700, fontSize: 16, color: "var(--c-ink)" }}
+                          onClick={() => setQuantityByProduct((p) => ({ ...p, [product.id]: clampQuantity((p[product.id] ?? 1) - 1) }))}
                         >
-                          −
+                          <Icon name="minus" size={13}/>
                         </button>
                         <input
                           id={`qty-${product.id}`}
                           type="number"
                           min={1}
                           max={10}
-                          className="w-8 text-center font-bold bg-transparent border-none outline-none text-sm"
+                          style={{ width: 28, textAlign: "center", fontWeight: 700, background: "transparent", border: "none", outline: "none", fontSize: 13 }}
                           value={quantityByProduct[product.id] ?? 1}
-                          onChange={(e) =>
-                            setQuantityByProduct((p) => ({
-                              ...p,
-                              [product.id]: clampQuantity(
-                                Number(e.target.value),
-                              ),
-                            }))
-                          }
+                          onChange={(e) => setQuantityByProduct((p) => ({ ...p, [product.id]: clampQuantity(Number(e.target.value)) }))}
                         />
                         <button
-                          className="w-7 h-7 flex items-center justify-center hover:bg-white rounded transition-colors text-lg font-bold"
-                          onClick={() =>
-                            setQuantityByProduct((p) => ({
-                              ...p,
-                              [product.id]: clampQuantity(
-                                (p[product.id] ?? 1) + 1,
-                              ),
-                            }))
-                          }
+                          style={{ width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", fontWeight: 700, fontSize: 16, color: "var(--c-ink)" }}
+                          onClick={() => setQuantityByProduct((p) => ({ ...p, [product.id]: clampQuantity((p[product.id] ?? 1) + 1) }))}
                         >
-                          +
+                          <Icon name="plus" size={13}/>
                         </button>
                       </div>
                     </div>
 
                     {quantityExceedsStock && !isSoldOut && (
-                      <p className="text-xs text-error font-medium">
-                        Quantity exceeds live stock.
-                      </p>
+                      <p style={{ fontSize: 11, color: "var(--c-danger)", fontWeight: 600 }}>Quantity exceeds live stock.</p>
                     )}
 
-                    <div className="flex gap-2 pt-1">
+                    <div style={{ display: "flex", gap: 8 }}>
                       <button
-                        className="btn-secondary flex-1 !py-2.5 !text-xs flex items-center justify-center gap-1"
-                        disabled={
-                          isSoldOut || quantityExceedsStock || checkouting
-                        }
+                        className="btn-secondary"
+                        style={{ flex: 1, padding: "8px 0", fontSize: 12 }}
+                        disabled={isSoldOut || quantityExceedsStock || checkouting}
                         onClick={() => addToCart(product)}
                       >
-                        <span className="material-symbols-outlined text-base">
-                          add_shopping_cart
-                        </span>
-                        Add to Cart
+                        <Icon name="cart" size={13}/>
+                        Add
                       </button>
                       <button
-                        className="btn-primary flex-1 !py-2.5 !text-xs flex items-center justify-center gap-1"
-                        disabled={
-                          isSoldOut ||
-                          quantityExceedsStock ||
-                          placingProductId === product.id ||
-                          checkouting
-                        }
-                        onClick={() => {
-                          void quickQueueOrder(product);
-                        }}
+                        className="btn-primary"
+                        style={{ flex: 1, padding: "8px 0", fontSize: 12 }}
+                        disabled={isSoldOut || quantityExceedsStock || placingProductId === product.id || checkouting}
+                        onClick={() => { void quickQueueOrder(product); }}
                       >
-                        <span className="material-symbols-outlined text-base">
-                          bolt
-                        </span>
-                        {placingProductId === product.id
-                          ? "Dispatching…"
-                          : "Quick Queue"}
+                        <Icon name="bolt" size={13}/>
+                        {placingProductId === product.id ? "…" : "Quick Queue"}
                       </button>
                     </div>
                   </div>
@@ -1225,51 +1184,47 @@ function MarketplacePage() {
         </section>
 
         {/* Sidebar */}
-        <aside className="lg:col-span-4 space-y-6">
-          <div className="sticky top-24 space-y-6">
+        <aside>
+          <div style={{ position: "sticky", top: 24, display: "flex", flexDirection: "column", gap: 16 }}>
             {/* Cart panel */}
-            <div className="glass-card rounded-[24px] p-6">
-              <div className="flex items-center justify-between mb-5 pb-4 border-b border-outline-variant/10">
-                <h2 className="font-headline text-lg font-bold flex items-center gap-2">
-                  <span className="material-symbols-outlined text-primary">
-                    shopping_cart
-                  </span>
+            <div className="ss-card" style={{ padding: "20px 22px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, paddingBottom: 14, borderBottom: "1px solid var(--c-line)" }}>
+                <h2 style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 15 }}>
+                  <Icon name="cart" size={15} stroke={1.8}/>
                   Dispatch Cart
                 </h2>
-                <span className="bg-primary-fixed text-on-primary-fixed px-2 py-0.5 rounded text-xs font-bold">
+                <span className="ss-pill ss-pill-strong" style={{ fontSize: 10 }}>
                   {cart.length} line{cart.length !== 1 ? "s" : ""}
                 </span>
               </div>
 
               {/* Shopper ID */}
-              <div className="relative mb-4">
-                <label className="absolute -top-2.5 left-4 px-2 bg-white/90 text-primary text-[10px] font-bold uppercase tracking-widest z-10 rounded">
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ display: "block", fontFamily: "var(--font-display)", fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "var(--c-muted)", marginBottom: 5 }}>
                   Shopper ID
                 </label>
                 <input
                   id="user-id"
-                  className="input-field !py-2.5 text-sm"
+                  className="input-field"
+                  style={{ fontSize: 13, padding: "8px 12px" }}
                   value={userId}
                   disabled={Boolean(user)}
                   onChange={(e) => setUserId(e.target.value)}
                 />
               </div>
 
-              {/* Cart summary */}
-              <div className="grid grid-cols-3 gap-2 mb-4">
+              {/* Cart summary strip */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 12 }}>
                 {[
                   { label: "Lines", value: cart.length },
                   { label: "Units", value: cartUnits },
                   { label: "Value", value: toCurrency(cartValueCents) },
                 ].map((s) => (
-                  <div
-                    key={s.label}
-                    className="bg-surface-container-low rounded-lg p-2 text-center"
-                  >
-                    <p className="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">
+                  <div key={s.label} style={{ background: "var(--c-surface-2)", borderRadius: 8, padding: "8px", textAlign: "center" as const }}>
+                    <p style={{ fontFamily: "var(--font-display)", fontSize: 9, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" as const, color: "var(--c-muted)", marginBottom: 2 }}>
                       {s.label}
                     </p>
-                    <p className="font-headline text-sm font-bold text-primary mt-0.5">
+                    <p style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: 14, color: "var(--c-primary)" }}>
                       {s.value}
                     </p>
                   </div>
@@ -1277,80 +1232,66 @@ function MarketplacePage() {
               </div>
 
               {invalidCartCount > 0 && (
-                <p className="text-xs text-error font-medium bg-error/5 rounded px-3 py-2 mb-3">
+                <p style={{ fontSize: 11, color: "var(--c-danger)", fontWeight: 600, background: "var(--c-danger-soft)", borderRadius: 8, padding: "6px 10px", marginBottom: 10 }}>
                   Adjust {invalidCartCount} line(s) before checkout.
                 </p>
               )}
 
               {/* Cart items */}
-              <ul className="space-y-3 mb-4 max-h-64 overflow-y-auto">
-                {cartEntries.length === 0 ? (
-                  <li className="text-sm text-on-surface-variant text-center py-6">
+              <ul style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12, maxHeight: 220, overflowY: "auto" }}>
+                {cartEntries.length === 0 && (
+                  <li style={{ fontSize: 13, color: "var(--c-muted)", textAlign: "center", padding: "20px 0" }}>
                     Cart is empty. Add products from the catalog.
                   </li>
-                ) : null}
+                )}
                 {cartEntries.map(({ item, product }) => {
                   const unavailable = !product || product.stock <= 0;
-                  const overStock = Boolean(
-                    product && item.quantity > product.stock,
-                  );
+                  const overStock = Boolean(product && item.quantity > product.stock);
                   const invalid = unavailable || overStock;
                   return (
                     <li
                       key={item.productId}
-                      className={`rounded-lg p-3 ${invalid ? "bg-error/5 border border-error/20" : "bg-surface-container-low"}`}
+                      style={{
+                        borderRadius: 8, padding: "10px 12px",
+                        background: invalid ? "var(--c-danger-soft)" : "var(--c-surface-2)",
+                        border: `1px solid ${invalid ? "var(--c-danger)" : "var(--c-line)"}`,
+                      }}
                     >
-                      <div className="flex items-start justify-between gap-2 mb-1">
-                        <div>
-                          <p className="text-sm font-semibold text-on-surface leading-snug">
-                            {product?.name ?? "Unavailable"}
-                          </p>
-                          <p className="text-[10px] text-outline">
+                      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
+                        <div style={{ minWidth: 0 }}>
+                          <p style={{ fontWeight: 700, fontSize: 12, lineHeight: 1.25 }}>{product?.name ?? "Unavailable"}</p>
+                          <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--c-muted)" }}>
                             {product?.sku ?? compactValue(item.productId, 8)}
                           </p>
                         </div>
                         <button
-                          className="text-error hover:scale-110 transition-transform flex-shrink-0"
+                          style={{ color: "var(--c-danger)", background: "none", border: "none", cursor: "pointer", padding: 0, flexShrink: 0 }}
                           onClick={() => removeFromCart(item.productId)}
                         >
-                          <span className="material-symbols-outlined text-lg">
-                            delete
-                          </span>
+                          <Icon name="trash" size={13}/>
                         </button>
                       </div>
-                      <div className="flex items-center justify-between text-xs text-on-surface-variant mt-1">
-                        <span>
-                          {product ? toCurrency(product.priceCents) : "—"} ·{" "}
-                          {product ? `${product.stock} live` : "missing"}
-                        </span>
-                        <div className="flex items-center gap-1">
-                          <span className="font-label">Qty:</span>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 11, color: "var(--c-muted)" }}>
+                        <span>{product ? toCurrency(product.priceCents) : "—"} · {product ? `${product.stock} live` : "missing"}</span>
+                        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                          <span>Qty:</span>
                           <input
                             id={`cart-qty-${item.productId}`}
                             type="number"
                             min={1}
                             max={10}
-                            className="w-12 text-center text-xs rounded border border-outline-variant/30 bg-white px-1 py-0.5"
+                            style={{ width: 36, textAlign: "center", fontSize: 11, border: "1px solid var(--c-line)", borderRadius: 4, padding: "1px 4px", background: "var(--c-surface)" }}
                             value={item.quantity}
-                            onChange={(e) =>
-                              updateCartQuantity(
-                                item.productId,
-                                Number(e.target.value),
-                              )
-                            }
+                            onChange={(e) => updateCartQuantity(item.productId, Number(e.target.value))}
                           />
-                          <span className="font-bold text-primary">
-                            {product
-                              ? toCurrency(product.priceCents * item.quantity)
-                              : "—"}
+                          <span style={{ fontWeight: 700, color: "var(--c-primary)" }}>
+                            {product ? toCurrency(product.priceCents * item.quantity) : "—"}
                           </span>
                         </div>
                       </div>
                       {invalid && (
-                        <p className="text-[10px] text-error mt-1">
-                          {unavailable
-                            ? "No longer available."
-                            : `Only ${product?.stock ?? 0} unit(s) live.`}
+                        <p style={{ fontSize: 10, color: "var(--c-danger)", marginTop: 4 }}>
+                          {unavailable ? "No longer available." : `Only ${product?.stock ?? 0} unit(s) live.`}
                         </p>
                       )}
                     </li>
@@ -1358,134 +1299,118 @@ function MarketplacePage() {
                 })}
               </ul>
 
-              {/* Address selector — only shown when logged in with saved addresses */}
+              {/* Address selector */}
               {user && addresses.length > 0 && (
-                <div className="relative mb-3">
-                  <label className="absolute -top-2.5 left-4 px-2 bg-white/90 text-primary text-[10px] font-bold uppercase tracking-widest z-10 rounded">
+                <div style={{ marginBottom: 10 }}>
+                  <label style={{ display: "block", fontFamily: "var(--font-display)", fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "var(--c-muted)", marginBottom: 5 }}>
                     Ship To
                   </label>
                   <select
-                    className="input-field !py-2.5 text-sm appearance-none pr-8 w-full"
+                    className="input-field"
+                    style={{ fontSize: 12, padding: "8px 10px", width: "100%" }}
                     value={selectedAddressId}
                     onChange={(e) => setSelectedAddressId(e.target.value)}
                   >
                     <option value="">— No address —</option>
                     {addresses.map((a) => (
                       <option key={a.id} value={a.id}>
-                        {a.fullName} · {a.line1}, {a.city}
-                        {a.isDefault ? " (Default)" : ""}
+                        {a.fullName} · {a.line1}, {a.city}{a.isDefault ? " (Default)" : ""}
                       </option>
                     ))}
                   </select>
                 </div>
               )}
               {user && addresses.length === 0 && (
-                <p className="text-[10px] text-on-surface-variant mb-3">
-                  <a href="/profile" className="text-primary hover:underline">Add a shipping address</a> to attach delivery info to orders.
+                <p style={{ fontSize: 11, color: "var(--c-muted)", marginBottom: 10 }}>
+                  <a href="/profile" style={{ color: "var(--c-primary)", textDecoration: "underline" }}>Add a shipping address</a> for delivery info.
                 </p>
               )}
 
-              <div className="flex gap-2">
+              <div style={{ display: "flex", gap: 8 }}>
                 <button
-                  className="btn-secondary flex-1 !py-3 !text-xs"
+                  className="btn-secondary"
+                  style={{ flex: 1, padding: "10px 0", fontSize: 12 }}
                   disabled={cart.length === 0 || checkouting}
                   onClick={clearCart}
                 >
                   Clear
                 </button>
                 <button
-                  className="btn-primary flex-1 !py-3 !text-xs"
-                  disabled={
-                    cart.length === 0 || invalidCartCount > 0 || checkouting
-                  }
-                  onClick={() => {
-                    void checkoutCart();
-                  }}
+                  className="btn-primary"
+                  style={{ flex: 1, padding: "10px 0", fontSize: 12 }}
+                  disabled={cart.length === 0 || invalidCartCount > 0 || checkouting}
+                  onClick={() => { void checkoutCart(); }}
                 >
-                  {checkouting
-                    ? `Dispatching ${cart.length}…`
-                    : "Checkout Cart"}
+                  {checkouting ? `Dispatching ${cart.length}…` : "Checkout Cart"}
                 </button>
               </div>
             </div>
 
             {/* Order relay panel */}
-            <div className="glass-card rounded-[24px] p-6">
-              <div className="flex items-center gap-2 mb-4 pb-4 border-b border-outline-variant/10">
-                <span className="material-symbols-outlined text-primary">
-                  package_2
-                </span>
-                <h2 className="font-headline text-lg font-bold">Order Relay</h2>
+            <div className="ss-card" style={{ padding: "20px 22px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 14, paddingBottom: 12, borderBottom: "1px solid var(--c-line)" }}>
+                <Icon name="pkg" size={15} stroke={1.8}/>
+                <h2 style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 15 }}>Order Relay</h2>
               </div>
 
               {/* Manual lookup */}
-              <div className="flex gap-2 mb-3">
+              <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
                 <input
                   id="job-id"
-                  className="input-field flex-1 !py-2.5 text-sm"
+                  className="input-field"
+                  style={{ flex: 1, fontSize: 12, padding: "8px 12px" }}
                   value={lookupJobId}
                   placeholder="Job ID lookup…"
                   onChange={(e) => setLookupJobId(e.target.value)}
                 />
                 <button
-                  className="btn-secondary !px-4 !py-2.5 !text-xs whitespace-nowrap"
-                  onClick={() => {
-                    void lookupJob();
-                  }}
+                  className="btn-secondary"
+                  style={{ padding: "8px 12px", fontSize: 12, whiteSpace: "nowrap" }}
+                  onClick={() => { void lookupJob(); }}
                 >
                   Track
                 </button>
               </div>
 
               {lookupError && (
-                <p className="text-xs text-error font-medium mb-2">
-                  {lookupError}
-                </p>
+                <p style={{ fontSize: 11, color: "var(--c-danger)", fontWeight: 600, marginBottom: 6 }}>{lookupError}</p>
               )}
-              <p className="text-xs text-on-surface-variant italic mb-4 bg-surface-container-low rounded px-3 py-2">
+              <p style={{ fontSize: 11, color: "var(--c-muted)", fontStyle: "italic", marginBottom: 12, background: "var(--c-surface-2)", borderRadius: 8, padding: "7px 10px" }}>
                 {activeMessage}
               </p>
 
-              <ul className="space-y-3 max-h-72 overflow-y-auto">
-                {trackedOrders.length === 0 ? (
-                  <li className="text-sm text-on-surface-variant text-center py-6">
+              <ul style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 260, overflowY: "auto" }}>
+                {trackedOrders.length === 0 && (
+                  <li style={{ fontSize: 13, color: "var(--c-muted)", textAlign: "center", padding: "20px 0" }}>
                     No jobs yet. Queue a single SKU or checkout the cart.
                   </li>
-                ) : null}
+                )}
                 {trackedOrders.map((order) => {
-                  const tone = toneForOrder(
-                    order.queueState,
-                    order.orderStatus,
-                  );
+                  const tone = toneForOrder(order.queueState, order.orderStatus);
                   const itemSummary = order.items
-                    .map(
-                      ({ productId, quantity }) =>
-                        `${productMap.get(productId)?.name ?? compactValue(productId, 12)} x${quantity}`,
-                    )
+                    .map(({ productId, quantity }) => `${productMap.get(productId)?.name ?? compactValue(productId, 12)} x${quantity}`)
                     .join(", ");
                   return (
                     <li
                       key={order.jobId}
-                      className={`rounded-lg p-3 border-l-4 text-xs space-y-0.5 ${orderToneClasses[tone] ?? ""}`}
+                      style={{
+                        borderRadius: 8, padding: "10px 12px",
+                        borderLeft: `3px solid ${orderToneBorder[tone] ?? "var(--c-line)"}`,
+                        background: orderToneBg[tone] ?? "var(--c-surface-2)",
+                        fontSize: 11,
+                      }}
                     >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-headline font-bold text-sm text-on-surface">
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, marginBottom: 4 }}>
+                        <span style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 12 }}>
                           Job {order.jobId}
                         </span>
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${urgencyClasses[tone] ?? ""}`}
-                        >
+                        <span className={urgencyPillClass[tone] ?? "ss-pill"} style={{ fontSize: 9 }}>
                           {prettyState(order.queueState)}
                         </span>
                       </div>
-                      <p className="text-on-surface-variant">
-                        {itemSummary || "No items"}
-                      </p>
-                      <p className="text-on-surface-variant">
-                        Result:{" "}
-                        <span className="font-bold">
-                          {order.orderStatus ?? "PENDING"}
-                        </span>
+                      <p style={{ color: "var(--c-muted)", marginBottom: 2 }}>{itemSummary || "No items"}</p>
+                      <p style={{ color: "var(--c-muted)" }}>
+                        Result: <strong>{order.orderStatus ?? "PENDING"}</strong>
                         {order.failureReason ? ` · ${order.failureReason}` : ""}
                       </p>
                     </li>
@@ -1496,6 +1421,7 @@ function MarketplacePage() {
           </div>
         </aside>
       </div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

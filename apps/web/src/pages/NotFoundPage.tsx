@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import Icon from "../components/Icon.js";
 
 const gags = [
   "The page joined a stealth startup and left no forwarding address.",
@@ -19,58 +20,104 @@ function NotFoundPage() {
   const gag = pickRandomGag();
 
   return (
-    <div className="page-container flex items-center justify-center min-h-[80vh]">
-      {/* Background glows */}
-      <div className="fixed inset-0 -z-10 pointer-events-none overflow-hidden">
-        <div className="absolute top-[10%] left-[5%] w-[40%] h-[40%] rounded-full bg-primary-container/10 blur-[120px]"></div>
-        <div className="absolute bottom-[10%] right-[5%] w-[35%] h-[35%] rounded-full bg-secondary-container/10 blur-[100px]"></div>
-      </div>
-
-      <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch">
-        {/* Info card */}
-        <div className="md:col-span-5 glass-card rounded-lg p-8 flex flex-col justify-center items-start">
-          <div className="bg-primary-container/10 p-3 rounded-md mb-6">
-            <span className="material-symbols-outlined text-primary-container text-2xl">explore_off</span>
+    <div className="page-container" style={{ display: "flex", flexDirection: "column", gap: 16, minHeight: "80vh", justifyContent: "center" }}>
+      {/* Main split */}
+      <div style={{ display: "grid", gridTemplateColumns: "5fr 7fr", gap: 16, alignItems: "stretch" }}>
+        {/* Left: dark info panel */}
+        <div style={{
+          background: "var(--c-ink)", borderRadius: "var(--d-radius-lg)",
+          padding: "48px 40px", display: "flex", flexDirection: "column", justifyContent: "center",
+        }}>
+          <div style={{
+            width: 44, height: 44, borderRadius: 12, background: "rgba(244,246,248,0.08)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            color: "var(--c-accent)", marginBottom: 28,
+          }}>
+            <Icon name="x" size={20} stroke={2}/>
           </div>
-          <p className="eyebrow mb-2">404 — Not Found</p>
-          <h1 className="font-headline text-4xl font-bold text-on-surface mb-4 tracking-tight leading-tight">
-            Lost in the <br /><span className="text-primary-container">Sphere.</span>
+          <p className="eyebrow" style={{ color: "rgba(244,246,248,0.45)", marginBottom: 12 }}>404 — Not Found</p>
+          <h1 style={{
+            fontFamily: "var(--font-display)", fontSize: 42, fontWeight: 800,
+            letterSpacing: "-0.04em", lineHeight: 1.0, color: "#fff", marginBottom: 16,
+          }}>
+            Lost in the<br />
+            <span style={{ color: "var(--c-accent)" }}>Sphere.</span>
           </h1>
-          <p className="font-body text-on-surface-variant mb-3 leading-relaxed">{gag}</p>
-          <p className="text-xs font-mono text-outline bg-surface-container px-3 py-2 rounded-lg mb-8 w-full">
-            route.lookup() → null
+          <p style={{ fontSize: 14, color: "rgba(244,246,248,0.6)", lineHeight: 1.6, marginBottom: 12 }}>
+            {gag}
           </p>
-          <div className="flex flex-col sm:flex-row gap-3 w-full">
-            <Link to="/" className="btn-primary flex items-center justify-center gap-2 group">
-              Back to Home
-              <span className="material-symbols-outlined text-sm group-hover:translate-x-1 transition-transform">arrow_forward</span>
+          <div style={{
+            fontFamily: "var(--font-mono)", fontSize: 11, color: "rgba(244,246,248,0.35)",
+            background: "rgba(244,246,248,0.04)", borderRadius: 8, padding: "8px 12px", marginBottom: 32,
+          }}>
+            route.lookup() → null
+          </div>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" as const }}>
+            <Link to="/" className="btn-primary" style={{ background: "#fff", color: "var(--c-ink)" }}>
+              Back to Home <Icon name="arrow" size={14}/>
             </Link>
-            <Link to="/marketplace" className="btn-secondary flex items-center justify-center">
+            <Link to="/marketplace" className="btn-secondary" style={{ borderColor: "rgba(255,255,255,0.2)", color: "#fff" }}>
               Marketplace
             </Link>
           </div>
         </div>
 
-        {/* Decorative large card */}
-        <div className="md:col-span-7 glass-card rounded-lg p-3 overflow-hidden relative group min-h-[300px] flex items-center justify-center bg-gradient-to-br from-primary-fixed/20 to-secondary-container/20">
-          <span className="font-headline text-[180px] font-bold text-primary/10 leading-none select-none">404</span>
+        {/* Right: decorative 404 panel */}
+        <div style={{
+          background: "var(--c-surface-2)", borderRadius: "var(--d-radius-lg)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          minHeight: 360, position: "relative", overflow: "hidden",
+        }}>
+          {/* Grid pattern background */}
+          <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0.3 }} preserveAspectRatio="xMidYMid slice">
+            <defs>
+              <pattern id="grid404" width="32" height="32" patternUnits="userSpaceOnUse">
+                <path d="M 32 0 L 0 0 0 32" fill="none" stroke="var(--c-line-strong)" strokeWidth="0.5"/>
+              </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#grid404)"/>
+          </svg>
+          <span style={{
+            fontFamily: "var(--font-display)", fontSize: "clamp(120px, 18vw, 200px)",
+            fontWeight: 800, color: "var(--c-line-strong)", letterSpacing: "-0.06em",
+            lineHeight: 1, userSelect: "none",
+            position: "relative", zIndex: 1,
+          }}>
+            404
+          </span>
         </div>
+      </div>
 
-        {/* Quick links */}
+      {/* Quick links */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
         {[
-          { icon: "shopping_bag", title: "Marketplace", desc: "Browse latest drops" },
-          { icon: "history", title: "Order History", desc: "View your purchases" },
-          { icon: "rss_feed", title: "Flash Blog", desc: "Latest commerce trends" },
+          { icon: "bag", path: "/marketplace", title: "Marketplace", desc: "Browse the latest drops" },
+          { icon: "pkg", path: "/orders", title: "Order History", desc: "View your purchases" },
+          { icon: "star", path: "/blog", title: "Journal", desc: "Engineering & design reads" },
         ].map((item) => (
-          <div key={item.title} className="md:col-span-4 glass-card rounded-lg p-6 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-surface-container-high flex items-center justify-center flex-shrink-0">
-              <span className="material-symbols-outlined text-secondary">{item.icon}</span>
+          <Link
+            key={item.path}
+            to={item.path}
+            style={{
+              display: "flex", alignItems: "center", gap: 16,
+              background: "var(--c-surface)", border: "1px solid var(--c-line)",
+              borderRadius: "var(--d-radius)", padding: "20px 24px",
+              transition: "border-color 0.2s, box-shadow 0.2s",
+              textDecoration: "none",
+            }}
+          >
+            <div style={{
+              width: 40, height: 40, borderRadius: 10, background: "var(--c-surface-2)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              color: "var(--c-primary)", flexShrink: 0,
+            }}>
+              <Icon name={item.icon} size={18} stroke={1.8}/>
             </div>
             <div>
-              <p className="font-headline font-bold text-on-surface">{item.title}</p>
-              <p className="font-body text-xs text-on-surface-variant">{item.desc}</p>
+              <p style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 14 }}>{item.title}</p>
+              <p style={{ fontSize: 12, color: "var(--c-muted)", marginTop: 2 }}>{item.desc}</p>
             </div>
-          </div>
+          </Link>
         ))}
       </div>
     </div>

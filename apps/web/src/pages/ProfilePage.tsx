@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.js";
+import Icon from "../components/Icon.js";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
 
@@ -26,20 +27,20 @@ export default function ProfilePage() {
   const { user, token, logout } = useAuth();
   const navigate = useNavigate();
 
-  // — password change
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [pwState, setPwState] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [pwMessage, setPwMessage] = useState("");
 
-  // — addresses
   const [addresses, setAddresses] = useState<ShippingAddress[]>([]);
   const [addrLoading, setAddrLoading] = useState(true);
   const [showAddrForm, setShowAddrForm] = useState(false);
   const [addrForm, setAddrForm] = useState(emptyAddressForm);
   const [addrSubmitting, setAddrSubmitting] = useState(false);
   const [addrError, setAddrError] = useState("");
+
+  const [activeTab, setActiveTab] = useState<"overview" | "addresses" | "security">("overview");
 
   const fetchAddresses = useCallback(async () => {
     if (!token) return;
@@ -125,184 +126,293 @@ export default function ProfilePage() {
   if (!user) return null;
 
   const memberSince = new Date(user.createdAt).toLocaleDateString("en-IN", { dateStyle: "long" });
+  const tabs = [
+    { id: "overview", label: "Overview", icon: "user" },
+    { id: "addresses", label: "Addresses", icon: "truck" },
+    { id: "security", label: "Security", icon: "shield" },
+  ] as const;
 
   return (
     <div className="page-container">
       {/* Header */}
-      <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4">
+      <header style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 32 }}>
         <div>
-          <p className="eyebrow">Account</p>
-          <h1 className="font-headline text-5xl font-bold tracking-tight text-on-surface">
+          <p className="eyebrow" style={{ marginBottom: 8 }}>Account</p>
+          <h1 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(36px, 5vw, 56px)", fontWeight: 800, letterSpacing: "-0.04em" }}>
             Your Profile
           </h1>
-          <p className="text-on-surface-variant mt-2">Manage your account settings.</p>
         </div>
-        <Link to="/orders" className="btn-secondary self-start md:self-auto">
-          View Order History
+        <Link to="/orders" className="btn-secondary" style={{ alignSelf: "flex-start" }}>
+          Order History <Icon name="arrow" size={14}/>
         </Link>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-        {/* Account info card */}
-        <div className="md:col-span-1 glass-card rounded-lg p-6 md:p-8 border border-white/20 flex flex-col gap-6">
-          <div className="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center">
-            <span className="material-symbols-outlined text-3xl">person</span>
+      {/* Stat strip */}
+      <div className="ss-card" style={{ padding: 0, overflow: "hidden", display: "grid", gridTemplateColumns: "repeat(3, 1fr)", marginBottom: 24 }}>
+        {[
+          { label: "Member Since", value: new Date(user.createdAt).toLocaleDateString("en-IN", { month: "short", year: "numeric" }) },
+          { label: "Addresses", value: addrLoading ? "…" : addresses.length },
+          { label: "Account ID", value: user.id.slice(-8).toUpperCase() },
+        ].map(({ label, value }, i) => (
+          <div key={label} style={{
+            padding: "20px 24px",
+            borderRight: i < 2 ? "1px solid var(--c-line)" : "none",
+          }}>
+            <p className="eyebrow" style={{ marginBottom: 6 }}>{label}</p>
+            <p style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 22, letterSpacing: "-0.02em" }}>{String(value)}</p>
           </div>
-          <div>
-            <p className="eyebrow">Email</p>
-            <p className="font-medium text-sm break-all">{user.email}</p>
-          </div>
-          <div>
-            <p className="eyebrow">Member Since</p>
-            <p className="font-medium text-sm">{memberSince}</p>
-          </div>
-          <div>
-            <p className="eyebrow">User ID</p>
-            <p className="font-mono text-xs text-on-surface-variant">{user.id}</p>
-          </div>
-          <button
-            onClick={handleLogout}
-            className="mt-auto btn-secondary text-error border-error/30 hover:bg-error/5 w-full"
-          >
-            Log Out
-          </button>
-        </div>
+        ))}
+      </div>
 
-        {/* Change password card */}
-        <div className="md:col-span-2 glass-card rounded-lg p-6 md:p-8 border border-white/20">
-          <h2 className="font-headline text-xl font-bold mb-6">Change Password</h2>
+      {/* Tab nav */}
+      <div style={{ display: "flex", gap: 4, marginBottom: 20, background: "var(--c-surface-2)", borderRadius: 12, padding: 4, width: "fit-content" }}>
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              padding: "8px 16px", borderRadius: 9, border: "none", cursor: "pointer",
+              fontFamily: "var(--font-display)", fontSize: 13, fontWeight: 700,
+              transition: "all 0.2s",
+              background: activeTab === tab.id ? "var(--c-ink)" : "transparent",
+              color: activeTab === tab.id ? "var(--c-surface)" : "var(--c-muted)",
+            }}
+          >
+            <Icon name={tab.icon} size={14} stroke={1.8}/>
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Overview tab */}
+      {activeTab === "overview" && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 20 }}>
+          {/* Account card */}
+          <div className="ss-card" style={{ padding: "28px" }}>
+            <div style={{
+              width: 56, height: 56, borderRadius: "50%", background: "var(--c-primary-soft)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              color: "var(--c-primary)", marginBottom: 20, fontSize: 22, fontFamily: "var(--font-display)", fontWeight: 800,
+            }}>
+              {user.email.charAt(0).toUpperCase()}
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <p className="eyebrow" style={{ marginBottom: 4 }}>Email</p>
+              <p style={{ fontWeight: 600, fontSize: 14, wordBreak: "break-all" }}>{user.email}</p>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <p className="eyebrow" style={{ marginBottom: 4 }}>Member Since</p>
+              <p style={{ fontWeight: 600, fontSize: 14 }}>{memberSince}</p>
+            </div>
+            <div style={{ marginBottom: 24 }}>
+              <p className="eyebrow" style={{ marginBottom: 4 }}>User ID</p>
+              <p style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--c-muted)", wordBreak: "break-all" }}>{user.id}</p>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="btn-secondary"
+              style={{ width: "100%", color: "var(--c-danger)", borderColor: "var(--c-danger)" }}
+            >
+              Log Out
+            </button>
+          </div>
+
+          {/* Quick info panel */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div className="ss-card" style={{ padding: "24px 28px" }}>
+              <h3 style={{ fontFamily: "var(--font-display)", fontSize: 16, fontWeight: 700, marginBottom: 12 }}>Account Summary</h3>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                {[
+                  { label: "Order history", action: "/orders", cta: "View orders" },
+                  { label: "Shipping addresses", action: null, cta: addresses.length === 0 ? "None saved" : `${addresses.length} saved` },
+                ].map((item) => (
+                  <div key={item.label} style={{ background: "var(--c-surface-2)", borderRadius: 10, padding: "14px 16px" }}>
+                    <p className="eyebrow" style={{ marginBottom: 4 }}>{item.label}</p>
+                    {item.action ? (
+                      <Link to={item.action} style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 14, color: "var(--c-primary)", textDecoration: "underline" }}>
+                        {item.cta}
+                      </Link>
+                    ) : (
+                      <p style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 14 }}>{item.cta}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="ss-card" style={{ padding: "24px 28px", background: "var(--c-ink)", color: "var(--c-surface)" }}>
+              <p className="eyebrow" style={{ color: "rgba(244,246,248,0.45)", marginBottom: 8 }}>Queue-first account</p>
+              <p style={{ fontSize: 14, color: "rgba(244,246,248,0.7)", lineHeight: 1.6 }}>
+                Your cart and order relay history persist across sessions. Every checkout is processed via a fair-queue system — first in, first served.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Addresses tab */}
+      {activeTab === "addresses" && (
+        <div className="ss-card" style={{ padding: "28px" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+            <h2 style={{ fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}>
+              <Icon name="truck" size={16} stroke={1.8}/>
+              Shipping Addresses
+            </h2>
+            {!showAddrForm && (
+              <button className="btn-primary" style={{ padding: "8px 16px", fontSize: 12 }} onClick={() => setShowAddrForm(true)}>
+                <Icon name="plus" size={13}/>
+                Add Address
+              </button>
+            )}
+          </div>
+
+          {showAddrForm && (
+            <form onSubmit={handleAddAddress} style={{ marginBottom: 24, background: "var(--c-surface-2)", borderRadius: 12, padding: 20 }}>
+              <h3 style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 15, marginBottom: 16 }}>New Address</h3>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                {[
+                  { id: "fullName", label: "Full Name", col: 2 },
+                  { id: "line1",    label: "Address Line 1", col: 2 },
+                  { id: "line2",    label: "Address Line 2 (optional)", col: 2 },
+                  { id: "city",     label: "City", col: 1 },
+                  { id: "state",    label: "State", col: 1 },
+                  { id: "postalCode", label: "Postal Code", col: 1 },
+                  { id: "country",  label: "Country Code", col: 1 },
+                ].map(({ id, label, col }) => (
+                  <div key={id} style={{ gridColumn: col === 2 ? "1 / -1" : undefined }}>
+                    <label style={{ display: "block", fontFamily: "var(--font-display)", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" as const, color: "var(--c-muted)", marginBottom: 5 }}>
+                      {label}
+                    </label>
+                    <input
+                      className="input-field"
+                      value={addrForm[id as keyof typeof addrForm]}
+                      onChange={(e) => setAddrForm((p) => ({ ...p, [id]: e.target.value }))}
+                      required={id !== "line2"}
+                      disabled={addrSubmitting}
+                      maxLength={id === "country" ? 2 : 200}
+                    />
+                  </div>
+                ))}
+              </div>
+              {addrError && <p style={{ fontSize: 13, color: "var(--c-danger)", marginTop: 10 }}>{addrError}</p>}
+              <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+                <button type="submit" className="btn-primary" style={{ padding: "10px 20px" }} disabled={addrSubmitting}>
+                  {addrSubmitting ? "Saving…" : "Save Address"}
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  style={{ padding: "10px 20px" }}
+                  onClick={() => { setShowAddrForm(false); setAddrForm(emptyAddressForm); setAddrError(""); }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          )}
+
+          {addrLoading ? (
+            <p style={{ fontSize: 13, color: "var(--c-muted)", padding: "16px 0" }}>Loading addresses…</p>
+          ) : addresses.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "40px 0" }}>
+              <div style={{ color: "var(--c-muted)", marginBottom: 10 }}><Icon name="truck" size={40} stroke={1.2}/></div>
+              <p style={{ fontSize: 14, color: "var(--c-muted)" }}>No saved addresses yet.</p>
+            </div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              {addresses.map((addr) => (
+                <div key={addr.id} style={{
+                  borderRadius: 12, padding: "16px 18px",
+                  background: addr.isDefault ? "var(--c-primary-soft)" : "var(--c-surface-2)",
+                  border: `1px solid ${addr.isDefault ? "var(--c-primary)" : "var(--c-line)"}`,
+                }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 8 }}>
+                    <div>
+                      <p style={{ fontWeight: 700, fontSize: 14 }}>{addr.fullName}</p>
+                      {addr.isDefault && <span className="ss-pill ss-pill-blue" style={{ fontSize: 10, marginTop: 4 }}>Default</span>}
+                    </div>
+                    <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                      {!addr.isDefault && (
+                        <button
+                          style={{ fontSize: 11, color: "var(--c-primary)", fontWeight: 700, background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}
+                          onClick={() => void handleSetDefault(addr.id)}
+                        >
+                          Set Default
+                        </button>
+                      )}
+                      <button
+                        style={{ color: "var(--c-danger)", background: "none", border: "none", cursor: "pointer", padding: 0 }}
+                        onClick={() => void handleDeleteAddress(addr.id)}
+                      >
+                        <Icon name="trash" size={15}/>
+                      </button>
+                    </div>
+                  </div>
+                  <p style={{ fontSize: 13, color: "var(--c-muted)", lineHeight: 1.6 }}>
+                    {addr.line1}{addr.line2 ? `, ${addr.line2}` : ""}<br />
+                    {addr.city}, {addr.state} {addr.postalCode}<br />
+                    {addr.country}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Security tab */}
+      {activeTab === "security" && (
+        <div className="ss-card" style={{ padding: "28px", maxWidth: 560 }}>
+          <h2 style={{ fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 700, marginBottom: 24 }}>
+            Change Password
+          </h2>
           {pwState === "success" ? (
-            <div className="flex flex-col items-center gap-4 py-8 text-center">
-              <span className="material-symbols-outlined text-5xl text-primary">check_circle</span>
-              <p className="font-headline text-lg font-bold">{pwMessage}</p>
+            <div style={{ textAlign: "center", padding: "32px 0" }}>
+              <div style={{ color: "var(--c-success)", marginBottom: 12 }}>
+                <Icon name="check" size={40} stroke={2.5}/>
+              </div>
+              <p style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 18, marginBottom: 16 }}>{pwMessage}</p>
               <button className="btn-secondary" onClick={() => setPwState("idle")}>Change Again</button>
             </div>
           ) : (
-            <form onSubmit={handlePasswordChange} className="flex flex-col gap-5">
-              <div>
-                <label className="eyebrow block mb-2">Current Password</label>
-                <input type="password" className="input-field w-full" value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)} required
-                  autoComplete="current-password" disabled={pwState === "loading"} />
-              </div>
-              <div>
-                <label className="eyebrow block mb-2">New Password</label>
-                <input type="password" className="input-field w-full" value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)} required minLength={8}
-                  autoComplete="new-password" disabled={pwState === "loading"} />
-              </div>
-              <div>
-                <label className="eyebrow block mb-2">Confirm New Password</label>
-                <input type="password" className="input-field w-full" value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)} required minLength={8}
-                  autoComplete="new-password" disabled={pwState === "loading"} />
-              </div>
-              {pwState === "error" && <p className="text-sm text-error font-medium">{pwMessage}</p>}
-              <button type="submit" className="btn-primary self-start" disabled={pwState === "loading"}>
+            <form onSubmit={handlePasswordChange} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {[
+                { label: "Current Password", value: currentPassword, setter: setCurrentPassword, ac: "current-password" },
+                { label: "New Password", value: newPassword, setter: setNewPassword, ac: "new-password" },
+                { label: "Confirm New Password", value: confirmPassword, setter: setConfirmPassword, ac: "new-password" },
+              ].map(({ label, value, setter, ac }) => (
+                <div key={label}>
+                  <label style={{ display: "block", fontFamily: "var(--font-display)", fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "var(--c-muted)", marginBottom: 6 }}>
+                    {label}
+                  </label>
+                  <input
+                    type="password"
+                    className="input-field"
+                    value={value}
+                    onChange={(e) => setter(e.target.value)}
+                    required
+                    minLength={8}
+                    autoComplete={ac}
+                    disabled={pwState === "loading"}
+                  />
+                </div>
+              ))}
+              {pwState === "error" && (
+                <p style={{ fontSize: 13, color: "var(--c-danger)", fontWeight: 600 }}>{pwMessage}</p>
+              )}
+              <button
+                type="submit"
+                className="btn-primary"
+                style={{ alignSelf: "flex-start", padding: "12px 24px" }}
+                disabled={pwState === "loading"}
+              >
                 {pwState === "loading" ? "Updating…" : "Update Password"}
               </button>
             </form>
           )}
         </div>
-      </div>
-
-      {/* Shipping addresses */}
-      <div className="glass-card rounded-lg p-6 md:p-8 border border-white/20">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="font-headline text-xl font-bold flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary">local_shipping</span>
-            Shipping Addresses
-          </h2>
-          {!showAddrForm && (
-            <button className="btn-secondary !py-2 !px-4 !text-xs" onClick={() => setShowAddrForm(true)}>
-              + Add Address
-            </button>
-          )}
-        </div>
-
-        {/* Add address form */}
-        {showAddrForm && (
-          <form onSubmit={handleAddAddress} className="mb-6 p-5 bg-surface-container-low rounded-lg">
-            <h3 className="font-headline font-bold mb-4">New Address</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {[
-                { id: "fullName", label: "Full Name", col: 2 },
-                { id: "line1",    label: "Address Line 1", col: 2 },
-                { id: "line2",    label: "Address Line 2 (optional)", col: 2 },
-                { id: "city",     label: "City", col: 1 },
-                { id: "state",    label: "State", col: 1 },
-                { id: "postalCode", label: "Postal Code", col: 1 },
-                { id: "country",  label: "Country Code", col: 1 },
-              ].map(({ id, label, col }) => (
-                <div key={id} className={col === 2 ? "md:col-span-2" : ""}>
-                  <label className="eyebrow block mb-1">{label}</label>
-                  <input
-                    className="input-field w-full"
-                    value={addrForm[id as keyof typeof addrForm]}
-                    onChange={(e) => setAddrForm((p) => ({ ...p, [id]: e.target.value }))}
-                    required={id !== "line2"}
-                    disabled={addrSubmitting}
-                    maxLength={id === "country" ? 2 : 200}
-                  />
-                </div>
-              ))}
-            </div>
-            {addrError && <p className="text-sm text-error mt-3">{addrError}</p>}
-            <div className="flex gap-3 mt-4">
-              <button type="submit" className="btn-primary" disabled={addrSubmitting}>
-                {addrSubmitting ? "Saving…" : "Save Address"}
-              </button>
-              <button type="button" className="btn-secondary"
-                onClick={() => { setShowAddrForm(false); setAddrForm(emptyAddressForm); setAddrError(""); }}>
-                Cancel
-              </button>
-            </div>
-          </form>
-        )}
-
-        {/* Address list */}
-        {addrLoading ? (
-          <p className="text-sm text-on-surface-variant py-4">Loading addresses…</p>
-        ) : addresses.length === 0 ? (
-          <div className="text-center py-8 text-on-surface-variant">
-            <span className="material-symbols-outlined text-4xl text-outline mb-2 block">location_off</span>
-            <p className="text-sm">No saved addresses yet.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {addresses.map((addr) => (
-              <div key={addr.id}
-                className={`rounded-lg p-4 border ${addr.isDefault ? "border-primary/30 bg-primary/5" : "border-outline-variant/20 bg-surface-container-low"}`}>
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <div>
-                    <p className="font-semibold text-sm">{addr.fullName}</p>
-                    {addr.isDefault && (
-                      <span className="text-[10px] font-bold text-primary uppercase tracking-widest">Default</span>
-                    )}
-                  </div>
-                  <div className="flex gap-2 flex-shrink-0">
-                    {!addr.isDefault && (
-                      <button className="text-xs text-primary hover:underline"
-                        onClick={() => void handleSetDefault(addr.id)}>
-                        Set Default
-                      </button>
-                    )}
-                    <button className="text-error hover:scale-110 transition-transform"
-                      onClick={() => void handleDeleteAddress(addr.id)}>
-                      <span className="material-symbols-outlined text-base">delete</span>
-                    </button>
-                  </div>
-                </div>
-                <p className="text-sm text-on-surface-variant leading-relaxed">
-                  {addr.line1}{addr.line2 ? `, ${addr.line2}` : ""}<br />
-                  {addr.city}, {addr.state} {addr.postalCode}<br />
-                  {addr.country}
-                </p>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      )}
     </div>
   );
 }

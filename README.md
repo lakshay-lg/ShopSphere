@@ -15,7 +15,7 @@ High-concurrency flash-commerce platform with a queue-first ordering pipeline, R
 - User profile with password change and shipping address management
 - Persistent cart and order relay via `localStorage`
 - Cursor-based paginated order history with per-order detail view
-- Admin dashboard for contact message review, gated by `ADMIN_TOKEN`
+- Full admin dashboard: contact messages, order management, product CRUD, user management, and live stats — all gated by `ADMIN_TOKEN`
 - Newsletter subscription capture with idempotent upsert
 - Long-form blog system with dedicated article routes
 - Privacy Policy and Terms of Service static pages
@@ -35,7 +35,7 @@ High-concurrency flash-commerce platform with a queue-first ordering pipeline, R
 | `/blog` | Blog listing |
 | `/blog/:slug` | Individual blog post |
 | `/contact` | Contact / support form |
-| `/admin` | Admin dashboard — contact message viewer (token gated) |
+| `/admin` | Admin dashboard — messages, orders, products, users (token gated) |
 | `/privacy` | Privacy Policy |
 | `/terms` | Terms of Service |
 | `/login` | Login / Register |
@@ -239,7 +239,26 @@ curl -X POST http://localhost:3000/api/contact \
 
 ### Admin
 
-- `GET /api/admin/contact-messages` — requires `Authorization: Bearer <ADMIN_TOKEN>`
+All admin routes require `Authorization: Bearer <ADMIN_TOKEN>`.
+
+#### Stats
+- `GET /api/admin/stats` — total revenue, order counts, user count, low-stock and out-of-stock alerts
+
+#### Orders
+- `GET /api/admin/orders` — all orders with user email, line items, and totals (latest 200)
+
+#### Products
+- `GET /api/admin/products` — list all products
+- `POST /api/admin/products` — create product (`sku`, `name`, `priceCents`, `stock`)
+- `PATCH /api/admin/products/:id` — update any product fields
+- `DELETE /api/admin/products/:id` — delete product
+
+#### Users
+- `GET /api/admin/users` — list all users with order counts
+- `DELETE /api/admin/users/:id` — delete user
+
+#### Contact Messages
+- `GET /api/admin/contact-messages` — list all contact form submissions
 
 ```bash
 curl http://localhost:3000/api/admin/contact-messages \
@@ -256,7 +275,12 @@ curl http://localhost:3000/api/admin/contact-messages \
 - Order history is cursor-paginated; each order links to a detail page showing items, totals, and shipping address
 - Profile page allows password change and full shipping address CRUD
 - Shipping address pre-selected at checkout from saved addresses (default address auto-selected)
-- Admin page at `/admin` prompts for `ADMIN_TOKEN` and renders contact submissions as collapsible cards with reply links
+- Admin dashboard at `/admin` prompts for `ADMIN_TOKEN` then shows:
+  - **Stats strip** — live revenue, order counts, user count, stock alert count
+  - **Messages tab** — contact form submissions as collapsible cards with reply links
+  - **Orders tab** — all orders filterable by status (All/Confirmed/Failed), expandable line-item detail
+  - **Products tab** — full CRUD: add product form, inline row editing, delete with confirmation
+  - **Users tab** — user list with order counts, delete with confirmation
 - Login page supports register/login via API; auth token stored as `ss_token` in `localStorage`
 - Blog has listing + full article routes; newsletter form persists subscriptions to DB
 - Unknown routes show custom randomized 404 gags
@@ -313,6 +337,6 @@ pnpm compose:down
 - Login uses constant-time comparison even for unknown emails to prevent user enumeration
 - JWT signing uses `JWT_SECRET` from environment; tokens expire after 7 days
 - Register is rate-limited to 5 attempts/min per IP; login to 10 attempts/min
-- Admin contact endpoint is protected by a separate `ADMIN_TOKEN` env var
+- All admin routes are protected by a separate `ADMIN_TOKEN` env var — product CRUD, user management, order viewing, and contact message access all require it
 - Razorpay payment signatures are verified server-side using HMAC-SHA256 with `RAZORPAY_KEY_SECRET` before any order is enqueued — client-side tampering cannot bypass stock deduction
 - Do not commit real `.env` values; only `.env.example` should be tracked

@@ -12,6 +12,7 @@ import { contactRoutes } from "./routes/contact.js";
 import { newsletterRoutes } from "./routes/newsletter.js";
 import { addressRoutes } from "./routes/addresses.js";
 import { paymentRoutes } from "./routes/payment.js";
+import { adminRoutes } from "./routes/admin.js";
 
 const app = Fastify({
   logger: true
@@ -30,6 +31,7 @@ const start = async (): Promise<void> => {
   await app.register(newsletterRoutes, { prefix: "/api" });
   await app.register(addressRoutes, { prefix: "/api" });
   await app.register(paymentRoutes, { prefix: "/api" });
+  await app.register(adminRoutes, { prefix: "/api" });
 
   app.get("/health", async () => {
     await prisma.$queryRaw`SELECT 1`;

@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import Icon from "../components/Icon.js";
+import Swatch, { getProductSwatch } from "../components/Swatch.js";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
 
@@ -20,19 +22,12 @@ const currency = new Intl.NumberFormat("en-IN", {
 });
 const toCurrency = (cents: number) => currency.format(cents / 100);
 
-function getUrgency(stock: number): { label: string; tone: "out" | "critical" | "low" | "ok" } {
-  if (stock <= 0) return { label: "Sold Out", tone: "out" };
-  if (stock <= 5) return { label: `Only ${stock} left!`, tone: "critical" };
-  if (stock <= 20) return { label: "Low Stock", tone: "low" };
-  return { label: "In Stock", tone: "ok" };
+function getUrgency(stock: number): { label: string; pillClass: string } {
+  if (stock <= 0) return { label: "Sold Out", pillClass: "ss-pill ss-pill-danger" };
+  if (stock <= 5) return { label: `Only ${stock} left!`, pillClass: "ss-pill ss-pill-danger" };
+  if (stock <= 20) return { label: "Low Stock", pillClass: "ss-pill ss-pill-warn" };
+  return { label: "In Stock", pillClass: "ss-pill ss-pill-success" };
 }
-
-const urgencyClasses = {
-  out: "bg-red-100 text-red-700 border border-red-200",
-  critical: "bg-orange-100 text-orange-700 border border-orange-200",
-  low: "bg-amber-100 text-amber-700 border border-amber-200",
-  ok: "bg-green-100 text-green-700 border border-green-200",
-};
 
 export default function ProductDetailPage() {
   const { productId } = useParams<{ productId: string }>();
@@ -56,12 +51,16 @@ export default function ProductDetailPage() {
 
   if (loading) {
     return (
-      <div className="page-container flex items-center justify-center min-h-[60vh]">
-        <div className="flex flex-col items-center gap-4 text-on-surface-variant">
-          <span className="material-symbols-outlined text-5xl animate-spin text-primary">
-            progress_activity
-          </span>
-          <p className="font-label text-sm uppercase tracking-widest">Loading product…</p>
+      <div className="page-container" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{
+            width: 48, height: 48, border: "3px solid var(--c-line)", borderTopColor: "var(--c-primary)",
+            borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 16px",
+          }}/>
+          <p style={{ fontFamily: "var(--font-display)", fontSize: 11, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--c-muted)" }}>
+            Loading product…
+          </p>
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </div>
       </div>
     );
@@ -70,13 +69,16 @@ export default function ProductDetailPage() {
   if (error || !product) {
     return (
       <div className="page-container">
-        <div className="glass-card rounded-lg p-16 text-center">
-          <span className="material-symbols-outlined text-6xl text-error mb-4 block">
-            error
-          </span>
-          <p className="font-headline text-xl font-bold mb-2">{error || "Product not found"}</p>
-          <Link to="/marketplace" className="btn-secondary inline-block mt-4">
-            ← Back to Marketplace
+        <div className="ss-card" style={{ padding: 64, textAlign: "center" }}>
+          <div style={{ color: "var(--c-danger)", marginBottom: 16 }}>
+            <Icon name="x" size={48} stroke={1.5}/>
+          </div>
+          <p style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 700, marginBottom: 16 }}>
+            {error || "Product not found"}
+          </p>
+          <Link to="/marketplace" className="btn-secondary">
+            <Icon name="arrowL" size={14}/>
+            Back to Marketplace
           </Link>
         </div>
       </div>
@@ -85,79 +87,127 @@ export default function ProductDetailPage() {
 
   const urgency = getUrgency(product.stock);
   const isSoldOut = product.stock <= 0;
+  const swatch = getProductSwatch(product.id, 0);
 
   return (
     <div className="page-container">
-      <header className="mb-10">
-        <Link
-          to="/marketplace"
-          className="inline-flex items-center gap-1 text-sm text-on-surface-variant hover:text-primary transition-colors mb-6"
-        >
-          <span className="material-symbols-outlined text-base">arrow_back</span>
-          Back to Marketplace
-        </Link>
-        <p className="eyebrow">Product Detail</p>
-        <h1 className="font-headline text-5xl font-bold tracking-tight text-on-surface">
-          {product.name}
-        </h1>
-      </header>
+      {/* Back link */}
+      <Link
+        to="/marketplace"
+        style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--c-muted)", marginBottom: 32, textDecoration: "none" }}
+      >
+        <Icon name="arrowL" size={14}/>
+        Back to Marketplace
+      </Link>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Visual card */}
-        <div className="glass-card rounded-2xl overflow-hidden border border-white/20">
-          <div className="h-64 bg-gradient-to-br from-primary-fixed to-secondary-container flex items-center justify-center relative">
-            <span className="font-headline text-9xl font-bold text-primary/20 select-none">
-              {product.name.charAt(0)}
-            </span>
-            <div
-              className={`absolute top-4 right-4 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest ${urgencyClasses[urgency.tone]}`}
-            >
-              {urgency.label}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, alignItems: "start" }}>
+        {/* Left: swatch + meta */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div className="ss-card" style={{ padding: 0, overflow: "hidden" }}>
+            <div style={{ aspectRatio: "1/1" }}>
+              <Swatch
+                kind={swatch.kind}
+                a={swatch.a}
+                b={swatch.b}
+                c={swatch.c}
+                label={product.name}
+                style={{ width: "100%", height: "100%" }}
+              />
             </div>
           </div>
-          <div className="p-6 flex items-center justify-between">
+
+          <div className="ss-card" style={{ padding: "20px 24px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
             <div>
-              <p className="eyebrow">SKU</p>
-              <p className="font-mono text-sm text-on-surface-variant">{product.sku}</p>
+              <p className="eyebrow" style={{ marginBottom: 4 }}>SKU</p>
+              <p style={{ fontFamily: "var(--font-mono)", fontSize: 13, color: "var(--c-muted)" }}>{product.sku}</p>
             </div>
-            <div className="text-right">
-              <p className="eyebrow">Listed</p>
-              <p className="text-sm font-medium">
+            <div>
+              <p className="eyebrow" style={{ marginBottom: 4 }}>Listed</p>
+              <p style={{ fontSize: 13 }}>
                 {new Date(product.createdAt).toLocaleDateString("en-IN", { dateStyle: "medium" })}
               </p>
             </div>
+            <div>
+              <p className="eyebrow" style={{ marginBottom: 4 }}>Last Updated</p>
+              <p style={{ fontSize: 13 }}>
+                {new Date(product.updatedAt).toLocaleDateString("en-IN", { dateStyle: "medium" })}
+              </p>
+            </div>
+            <div>
+              <p className="eyebrow" style={{ marginBottom: 4 }}>Product ID</p>
+              <p style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--c-muted)" }}>{product.id.slice(-12)}</p>
+            </div>
           </div>
         </div>
 
-        {/* Info card */}
-        <div className="glass-card rounded-2xl p-8 border border-white/20 flex flex-col gap-6">
-          <div>
-            <p className="eyebrow">Price</p>
-            <p className="font-headline text-4xl font-black text-primary">
-              {toCurrency(product.priceCents)}
-            </p>
-          </div>
+        {/* Right: pricing + CTA */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div className="ss-card" style={{ padding: "32px 36px" }}>
+            {/* Status badge */}
+            <span className={urgency.pillClass} style={{ marginBottom: 16, display: "inline-flex" }}>
+              <span className="ss-dot ss-dot-pulse" style={{ color: isSoldOut ? "var(--c-danger)" : product.stock <= 20 ? "var(--c-warn)" : "var(--c-success)" }}/>
+              {urgency.label}
+            </span>
 
-          <div>
-            <p className="eyebrow">Stock Available</p>
-            <p className={`font-headline text-2xl font-bold ${isSoldOut ? "text-error" : "text-on-surface"}`}>
-              {isSoldOut ? "Sold Out" : product.stock.toLocaleString()}
+            <h1 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(24px, 3vw, 36px)", fontWeight: 800, letterSpacing: "-0.03em", marginBottom: 8 }}>
+              {product.name}
+            </h1>
+            <p style={{ fontSize: 13, color: "var(--c-muted)", marginBottom: 28 }}>
+              Flash-sale product · Drop 14 · Limited units
             </p>
-          </div>
 
-          <div className="mt-auto pt-4 border-t border-outline-variant/20">
-            <p className="text-sm text-on-surface-variant mb-4">
-              This is a flash-sale product. Head to the Marketplace to place an order before stock runs out.
+            <div style={{ display: "flex", gap: 24, marginBottom: 28, padding: "20px 0", borderTop: "1px solid var(--c-line)", borderBottom: "1px solid var(--c-line)" }}>
+              <div>
+                <p className="eyebrow" style={{ marginBottom: 4 }}>Price</p>
+                <p style={{ fontFamily: "var(--font-display)", fontSize: 40, fontWeight: 800, letterSpacing: "-0.04em", color: "var(--c-primary)" }}>
+                  {toCurrency(product.priceCents)}
+                </p>
+              </div>
+              <div>
+                <p className="eyebrow" style={{ marginBottom: 4 }}>Stock</p>
+                <p style={{ fontFamily: "var(--font-display)", fontSize: 40, fontWeight: 800, letterSpacing: "-0.04em", color: isSoldOut ? "var(--c-danger)" : "var(--c-ink)" }}>
+                  {isSoldOut ? "—" : product.stock.toLocaleString("en-IN")}
+                </p>
+              </div>
+            </div>
+
+            <p style={{ fontSize: 13, color: "var(--c-muted)", lineHeight: 1.6, marginBottom: 20 }}>
+              This is a flash-sale product. Head to the Marketplace to place an order before stock runs out. Orders are processed via a fair-queue system.
             </p>
+
             <Link
               to="/marketplace"
-              className={isSoldOut ? "btn-secondary w-full text-center block" : "btn-primary w-full text-center block"}
+              className={isSoldOut ? "btn-secondary" : "btn-primary"}
+              style={{ display: "flex", justifyContent: "center", width: "100%", padding: "14px 0" }}
             >
               {isSoldOut ? "View Marketplace" : "Buy on Marketplace"}
+              <Icon name="arrow" size={15}/>
             </Link>
+          </div>
+
+          {/* Shipping / returns badges */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            {[
+              { icon: "truck", title: "Ships in 24h", sub: "Bengaluru hub" },
+              { icon: "refresh", title: "30-day returns", sub: "No questions asked" },
+              { icon: "shield", title: "2-year warranty", sub: "All electronics" },
+              { icon: "bolt", title: "Flash-queued", sub: "Fair ordering" },
+            ].map((b) => (
+              <div key={b.title} className="ss-card" style={{ padding: "14px 16px", display: "flex", gap: 10, alignItems: "center" }}>
+                <div style={{ color: "var(--c-primary)", flexShrink: 0 }}>
+                  <Icon name={b.icon} size={16} stroke={1.8}/>
+                </div>
+                <div>
+                  <p style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 12 }}>{b.title}</p>
+                  <p style={{ fontSize: 11, color: "var(--c-muted)" }}>{b.sub}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

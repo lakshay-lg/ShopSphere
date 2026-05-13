@@ -192,6 +192,7 @@ export default function OrderHistoryPage() {
   );
 
   useEffect(() => {
+    if (authLoading) return;
     if (!user) { navigate("/login"); return; }
     setLoading(true);
     fetchOrders()

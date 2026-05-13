@@ -2,6 +2,23 @@
 
 High-concurrency flash-commerce platform with a queue-first ordering pipeline, Redis idempotency controls, and a multi-page React storefront.
 
+## Screenshots
+
+| | |
+|---|---|
+| ![Home](docs/screenshots/home.png) | ![Marketplace](docs/screenshots/marketplace.png) |
+| **Home** | **Marketplace** |
+| ![Product Detail](docs/screenshots/product-detail.png) | ![Login](docs/screenshots/login.png) |
+| **Product Detail** | **Login / Register** |
+| ![Blog](docs/screenshots/blog.png) | ![Contact](docs/screenshots/contact.png) |
+| **Journal (Blog)** | **Contact** |
+| ![Profile](docs/screenshots/profile.png) | ![404](docs/screenshots/404.png) |
+| **Profile** | **404** |
+| ![Admin Dashboard](docs/screenshots/admin-dashboard.png) | ![Admin Products](docs/screenshots/admin-products.png) |
+| **Admin — Stats & Messages** | **Admin — Product Management** |
+| ![Admin Users](docs/screenshots/admin-users.png) | ![Admin Gate](docs/screenshots/admin-gate.png) |
+| **Admin — User Management** | **Admin — Token Gate** |
+
 ## Highlights
 
 - Fastify API with catalog, flash-sale ordering, payments, auth, addresses, newsletter, contact, and admin endpoints

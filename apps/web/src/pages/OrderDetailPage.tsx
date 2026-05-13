@@ -48,7 +48,7 @@ const orderTotal = (items: OrderItem[]) =>
 
 export default function OrderDetailPage() {
   const { orderId } = useParams<{ orderId: string }>();
-  const { user, token } = useAuth();
+  const { user, token, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
 
   const [order, setOrder] = useState<Order | null>(null);
@@ -56,6 +56,7 @@ export default function OrderDetailPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    if (authLoading) return;
     if (!user) { navigate("/login"); return; }
     if (!orderId || !token) return;
 

@@ -24,7 +24,7 @@ const emptyAddressForm = {
 };
 
 export default function ProfilePage() {
-  const { user, token, logout } = useAuth();
+  const { user, token, logout, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
 
   const [currentPassword, setCurrentPassword] = useState("");
@@ -58,9 +58,10 @@ export default function ProfilePage() {
   }, [token]);
 
   useEffect(() => {
+    if (authLoading) return;
     if (!user) { navigate("/login"); return; }
     void fetchAddresses();
-  }, [user, navigate, fetchAddresses]);
+  }, [user, authLoading, navigate, fetchAddresses]);
 
   async function handlePasswordChange(e: React.FormEvent) {
     e.preventDefault();

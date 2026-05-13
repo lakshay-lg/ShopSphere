@@ -13,6 +13,84 @@ export interface BlogPost {
 
 export const blogPosts: BlogPost[] = [
   {
+    slug: "a-complete-admin-portal-for-a-flash-commerce-platform",
+    title: "A Complete Admin Portal for a Flash-Commerce Platform",
+    tag: "Build Log",
+    date: "May 13, 2026",
+    readTime: "6 min read",
+    excerpt:
+      "A single endpoint that dumps contact messages into a token-gated page is not an admin portal. Building one that actually earns the name required thinking seriously about what operators need to run a live platform.",
+    sections: [
+      {
+        heading: "The contact viewer was a starting point, not a destination",
+        paragraphs: [
+          "The original admin page had a single purpose: let someone with the right token read contact form submissions. It did that job well. But as the platform grew — products, users, orders, payment flow — the gap between what the site could do and what the admin surface could observe became increasingly hard to ignore. You could have a live commerce platform and no way to see a single order or change a product's stock without going directly to the database.",
+          "The rewrite started from a simple question: what does a person actually need to operate this platform day-to-day? The answer was four things. They need to see the numbers at a glance. They need to manage the catalog. They need visibility into orders. They need to handle user accounts. Everything else is secondary to those four."
+        ]
+      },
+      {
+        heading: "The stats strip is the most honest part of the dashboard",
+        paragraphs: [
+          "The stats strip at the top of the dashboard shows four numbers: total revenue from confirmed orders, total order count with a failed-order breakdown, registered user count, and a stock alert count that turns red when products are out or running low. None of those numbers require a chart or a trend line to be useful. They answer the question 'is the platform working right now?' in a single glance.",
+          "The revenue figure required a small design decision. Prisma's aggregate API does not support computed expressions like `SUM(priceCents * quantity)`, so the calculation happens in application code: fetch all confirmed orders with their items, reduce in JavaScript. For a platform at this scale that is perfectly fast. At larger volumes the right move is a `$queryRaw` with a SQL expression, and the refactor path is obvious. Noting that during the build rather than after it is the kind of thing that keeps a codebase honest."
+        ]
+      },
+      {
+        heading: "Product CRUD without a framework",
+        paragraphs: [
+          "The products tab is a full create-read-update-delete interface built without an admin framework. The table renders all products with color-coded stock values, inline row editing with controlled inputs that swap in on click, and a collapsible add-product form at the top. Saves go directly to `PATCH /api/admin/products/:id`, which validates the body with Zod and updates the Prisma record.",
+          "One detail worth noting: the existing public product routes — `POST /api/products` and `PATCH /api/products/:id/stock` — were already in the codebase unprotected. The new admin routes add a properly gated equivalent. The older routes remain for backwards compatibility with the load test script, which was written before the admin layer existed. That kind of legacy coexistence is a normal part of a real codebase. Knowing which routes are admin-gated and which are not is the kind of thing that should live in documentation, not just in memory."
+        ]
+      },
+      {
+        heading: "Orders and users complete the picture",
+        paragraphs: [
+          "The orders tab fetches the latest two hundred orders and merges user emails in application code, since the `Order` model stores `userId` as a plain string with no Prisma back-relation to the `User` model. A `groupBy` query on the `Order` table produces per-user order counts for the users tab by the same approach. Neither workaround is particularly clever — they are pragmatic responses to a schema constraint that would require a migration to resolve the right way. They are documented in comments rather than hidden.",
+          "The users tab shows registered accounts alongside their order counts and join dates. Delete operations include a confirmation prompt and cascade through the user's data. The admin portal now gives a realistic picture of who is using the platform and how. That sounds like a minor addition, but the difference between a platform you can observe and one you cannot is the difference between operating software and just running it."
+        ]
+      }
+    ]
+  },
+  {
+    slug: "redesigning-shopsphere-from-the-design-token-up",
+    title: "Redesigning ShopSphere from the Design Token Up",
+    tag: "Design",
+    date: "May 13, 2026",
+    readTime: "7 min read",
+    excerpt:
+      "Rebuilding a frontend without touching the business logic is an exercise in restraint. The challenge is not what to change — it is ensuring nothing that already works stops working while you do it.",
+    sections: [
+      {
+        heading: "The case against framework-dependent styling",
+        paragraphs: [
+          "The original UI was functional but visually inconsistent. Colors, spacing, and typographic choices accumulated organically across thirteen pages without a shared vocabulary to keep them coherent. The fix was not a new component library or a utility-class framework — it was a CSS custom property system: a small set of named tokens that every page could reference and that could be changed in one place.",
+          "The token set is deliberately minimal. A handful of color variables — `--c-ink` for the primary dark tone, `--c-accent` for the orange highlight, `--c-primary` for the blue — combined with two font stacks and a spacing baseline covers the vast majority of decisions. Anything not covered by a token is a one-off and stays that way. The discipline of using tokens well comes from knowing which decisions deserve a name and which do not."
+        ]
+      },
+      {
+        heading: "The Swatch component solved a real problem elegantly",
+        paragraphs: [
+          "The product catalog has no images. The API returns names, prices, and stock counts — nothing visual. An earlier version used placeholder blocks of color, which made the marketplace feel like a spreadsheet. The redesign introduced a Swatch component: a set of ten deterministic SVG art patterns — stripes, concentric rings, grooves, woven geometry, grid, mountain profile, tessellated tiles, lens distortion, knit texture, and a soft orb — each rendered from a hash of the product ID.",
+          "The important property is consistency. A product's pattern does not change between page loads, between the marketplace grid and the product detail page, or between sessions. The hash function maps the product ID to a pattern index and a palette index separately, so the same pattern can appear in different color combinations across the catalog without looking repetitive. The result is a catalog that feels visually considered rather than visually empty, without requiring a single real image."
+        ]
+      },
+      {
+        heading: "Thirteen pages, one constraint",
+        paragraphs: [
+          "The redesign covered every page in the application: home, marketplace, product detail, login, profile, order history, order detail, blog listing, blog post, contact, admin, privacy, terms, and the 404. The constraint on every page was the same — preserve all working logic, replace only the visual layer. State management, API calls, auth guards, form handlers, polling loops, and payment flows stayed exactly as they were.",
+          "The most technically demanding page to reskin was the marketplace. It is roughly fifteen hundred lines and contains the Razorpay payment flow, BullMQ job polling, cart localStorage persistence, idempotency key management, and a quantity stepper system. Changing the wrong line in the wrong JSX block would break checkout. The approach was to edit only the parts that could be changed safely: class maps for visual state, the page header, the metric strip, the product card layout, and the sidebar. Everything between those visual anchors stayed untouched."
+        ]
+      },
+      {
+        heading: "What a redesign is actually for",
+        paragraphs: [
+          "A visual redesign of a working system is not really about aesthetics, even when it looks like it is. It is about coherence. A platform that uses the same visual language across all its surfaces communicates something to the people using it: that the same level of care was applied everywhere, that the details were considered, that the experience was designed rather than assembled.",
+          "For a technical portfolio project, that coherence carries additional weight. The code behind the UI is the actual artifact, but the UI is what most people see first. A well-designed surface earns the time needed to explain the distributed systems work underneath it. Getting that right — without breaking thirteen pages of working business logic in the process — is the kind of constraint that makes a project interesting to reflect on."
+        ]
+      }
+    ]
+  },
+  {
     slug: "building-shopsphere-before-it-was-cool",
     title: "Building ShopSphere Before It Was Cool",
     tag: "Build Log",

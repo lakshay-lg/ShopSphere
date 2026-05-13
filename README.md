@@ -8,10 +8,10 @@ High-concurrency flash-commerce platform with a queue-first ordering pipeline, R
 |---|---|
 | ![Home](docs/screenshots/home.png) | ![Marketplace](docs/screenshots/marketplace.png) |
 | **Home** | **Marketplace** |
-| ![Cart](docs/screenshots/cart-sidebar.png) | ![Checkout](docs/screenshots/checkout-razorpay.png) |
-| **Cart & Order Relay** | **Razorpay Checkout** |
-| ![Product Detail](docs/screenshots/product-detail.png) | ![Order History](docs/screenshots/order-history.png) |
-| **Product Detail** | **Order History** |
+| ![Product Detail](docs/screenshots/product-detail.png) | ![Checkout](docs/screenshots/checkout-razorpay.png) |
+| **Product Detail** | **Razorpay Checkout** |
+| ![Order History](docs/screenshots/order-history.png) | ![404](docs/screenshots/404.png) |
+| **Order History** | **404** |
 | ![Blog](docs/screenshots/blog.png) | ![Contact](docs/screenshots/contact.png) |
 | **Journal (Blog)** | **Contact** |
 | ![Login](docs/screenshots/login.png) | ![Profile](docs/screenshots/profile.png) |
